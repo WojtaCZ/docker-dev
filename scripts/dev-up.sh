@@ -31,17 +31,37 @@ fi
 
 CLAUDE_JSON="$HOME/.claude.json"
 CLAUDE_DIR="$HOME/.claude"
+CLAUDE_CREDS="$CLAUDE_DIR/.credentials.json"
 
 if [ ! -f "$CLAUDE_JSON" ]; then
     echo "WARN: $CLAUDE_JSON not found. Run 'claude' on the host at least once." >&2
 fi
 mkdir -p "$CLAUDE_DIR"
+touch "$CLAUDE_JSON"
+[ -f "$CLAUDE_CREDS" ] || { touch "$CLAUDE_CREDS"; chmod 600 "$CLAUDE_CREDS"; }
 
+# .claude.json and .credentials.json are bind-mounted straight onto their
+# final in-container paths, NOT through entrypoint.sh's symlink-after-copy at
+# /host-claude-auth.json / /host-claude-dir (which now harmlessly no-ops,
+# since those paths are never populated here anymore — see the removed block
+# below). `claude login` persists credentials with a write-temp-then-
+# rename(2), and rename(2) onto a plain symlink just replaces the symlink
+# with a new inode — silently orphaning the host file — so a login done only
+# inside a --rm container never survived a restart. A real bind mount IS a
+# mount point: rename(2) onto it fails EBUSY, which Claude Code's credential
+# writer specifically catches and falls back to copyFile(), which writes
+# through to the real host file. Verified against the shipped `claude`
+# binary's write path and reproduced end-to-end with both mount styles.
 MOUNTS=(
     -v "$WORKSPACE:/workspace"
-    -v "$CLAUDE_JSON:/host-claude-auth.json"
-    -v "$CLAUDE_DIR:/host-claude-dir"
+    -v "$CLAUDE_JSON:/home/dev/.claude.json"
+    -v "$CLAUDE_CREDS:/home/dev/.claude/.credentials.json"
 )
+for shared in projects memory; do
+    if [ -e "$CLAUDE_DIR/$shared" ]; then
+        MOUNTS+=(-v "$CLAUDE_DIR/$shared:/home/dev/.claude/$shared")
+    fi
+done
 
 # Persistent package caches. Without these every `--rm` run re-downloads npm,
 # uv and cargo content from scratch — the single biggest startup cost.
