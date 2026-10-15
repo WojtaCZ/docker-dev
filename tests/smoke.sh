@@ -31,6 +31,12 @@ pass "layer dir present: $(ls "$HOME/.claude-layers" | tr '\n' ' ')"
 jq -e . "$HOME/.claude/settings.json" >/dev/null || fail "merged settings.json is not valid JSON"
 pass "merged settings.json is valid JSON"
 
+jq -e '.enabledPlugins["superpowers@claude-plugins-official"] == true' "$HOME/.claude/settings.json" >/dev/null \
+    || fail "superpowers not enabled in merged settings"
+claude plugin list 2>/dev/null | grep -q 'superpowers@claude-plugins-official' \
+    || fail "superpowers plugin not installed"
+pass "superpowers plugin installed and enabled"
+
 for server in github git context7 sequential-thinking; do
     jq -e --arg s "$server" '.mcpServers | has($s)' "$HOME/.claude/settings.json" >/dev/null \
         || fail "MCP server '$server' missing from merged settings"

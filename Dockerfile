@@ -67,6 +67,16 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 
 ENV PATH="/home/${USER_NAME}/.local/bin:${PATH}"
 
+# Superpowers plugin, user scope, baked in so every image in the fleet (all
+# descend from this one) has it with no network round-trip at container start.
+# It lives under ~/.claude/plugins, which is not one of the bind-mounted paths.
+# The *enabled* flag is NOT written here: entrypoint.sh regenerates
+# settings.json from ~/.claude-layers on every start, so enabledPlugins is
+# declared in claude-baseline/settings.json instead.
+RUN claude plugin marketplace add anthropics/claude-plugins-official && \
+    claude plugin install superpowers@claude-plugins-official --scope user && \
+    claude plugin list | grep -q 'superpowers@claude-plugins-official'
+
 # Default user stays ${USER_NAME}; the entrypoint's root phase is inert here.
 # To use the UID/GID remap, start the container as root and let the entrypoint
 # drop privileges itself:
