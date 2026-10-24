@@ -4,7 +4,7 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-cd "$ROOT"
+cd "$ROOT" || exit 1
 fails=0
 ok()  { echo "  ok  $*"; }
 bad() { echo "FAIL: $*" >&2; fails=$((fails + 1)); }

@@ -30,7 +30,7 @@ pass "host g++ and clang++ build and run"
 cd /; rm -rf "$work"
 
 echo "== no duplicate cross-tool basenames =="
-dups=$(ls /usr/local/bin /usr/bin | grep -E '^(arm-none-eabi|riscv-none-elf|tc32-elf)-' | sort | uniq -d)
+dups=$(find /usr/local/bin /usr/bin -maxdepth 1 -printf '%f\n' | grep -E '^(arm-none-eabi|riscv-none-elf|tc32-elf)-' | sort | uniq -d)
 [ -z "$dups" ] || fail "duplicate cross-tool names on PATH: $dups"
 pass "cross-tool names unique"
 
@@ -54,7 +54,7 @@ pass "trail telemetry disabled"
 echo "== short baseline memory =="
 M="$HOME/.claude/CLAUDE.md"
 lines=$(wc -l < "$M")
-[ "$lines" -le 120 ] || fail "~/.claude/CLAUDE.md is $lines lines (limit 120): platform detail belongs in skills"
+[ "$lines" -le 120 ] || fail "CLAUDE.md is $lines lines (limit 120): platform detail belongs in skills"
 for needle in '.mcu-profile.json' '.web-profile.json' 'dev-components.json' 'MAINTENANCE RULE' 'trail-ensure' '/workspaces/' 'mcu --cross-prefix'; do
     grep -qF -- "$needle" "$M" || fail "baseline memory does not mention '$needle'"
 done

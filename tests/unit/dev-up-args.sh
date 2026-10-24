@@ -54,7 +54,7 @@ expect "projects shared" "$H/.claude/projects:/home/dev/.claude/projects"
 for s in history.jsonl file-history backups sessions session-env shell-snapshots; do
     expect "persisted state: $s" "$H/.claude-dev/$s:/home/dev/.claude/$s"
 done
-expect "~/.trail persisted" "$H/.trail:/home/dev/.trail"
+expect ".trail persisted" "$H/.trail:/home/dev/.trail"
 expect "telink SDK mount" "$H/telink/Telink_825X_SDK:/opt/telink/sdk:ro"
 expect "CubeCLT mount" "$H/st/STM32CubeCLT:/opt/st/clt:ro"
 expect "CubeWBA mount" "$H/st/cubewba:/opt/st/cubewba:ro"
