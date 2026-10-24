@@ -23,9 +23,9 @@ for d in "$SK"/*/; do
     [ "${#desc}" -ge 60 ] || bad "$name: description shorter than 60 chars (${#desc})"
     case "$name" in .gitkeep) ;; esac
 done
-[ "$n" -ge 40 ] || bad "expected >= 40 skill directories (37 imported + 3 new), found $n"
+[ "$n" -ge 41 ] || bad "expected >= 41 skill directories (37 imported + 4 new), found $n"
 
-for s in arm-project-layout telink-sdk-mount embedded-tooling-reference; do
+for s in arm-project-layout telink-sdk-mount embedded-tooling-reference web-tooling-reference; do
     [ -f "$SK/$s/SKILL.md" ] || bad "new skill $s missing"
 done
 
@@ -36,6 +36,12 @@ missing=$(grep '^skill|' "$ROOT/tests/parity/manifest.txt" | cut -d'|' -f2 | whi
 # The global-CROSS_PREFIX wording must be gone from skill text.
 stale=$(grep -rl 'exported by each leaf image' "$SK" 2>/dev/null || true)
 [ -z "$stale" ] || bad "skills still claim CROSS_PREFIX is exported by each leaf image: $stale"
+
+# Anything that uses ${CROSS_PREFIX} must say where it comes from now that it is
+# per-project (otherwise host binutils silently run on an ARM/RISC-V ELF).
+nopre=$(grep -rlE '\$\{?CROSS_PREFIX' "$SK" "$ROOT/claude-baseline/commands" 2>/dev/null \
+        | while read -r f; do grep -q 'mcu --cross-prefix' "$f" || echo "${f#"$ROOT"/}"; done)
+[ -z "$nopre" ] || bad "files use \${CROSS_PREFIX} without the mcu --cross-prefix preamble: $nopre"
 
 [ "$fails" -eq 0 ] || { echo "$fails failure(s)" >&2; exit 1; }
 echo "skills: all passed ($n skill directories)"

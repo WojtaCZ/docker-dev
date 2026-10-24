@@ -61,7 +61,11 @@ expect "CubeWBA mount" "$H/st/cubewba:/opt/st/cubewba:ro"
 expect "pyocd cache volume" "dev-cache-pyocd:/opt/pyocd"
 expect "composer cache volume" "dev-cache-composer:/home/dev/.cache/composer"
 expect "image default" "dev-template"
-expect "container default" "dev"
+expect "container default is per project (two projects can run side by side)" "dev-$mount_name"
+expect "container labelled for dev-attach" "dev.attach=1"
+runup DEV_CONTAINER=custom "$UP" "$T/ws/app"
+expect "DEV_CONTAINER still overrides" "custom"
+runup "$UP" "$T/ws/app"
 
 # --- review focus 3: odd workspace paths ---------------------------------------
 mkdir -p "$T/my proj" "$T/ünï" "$T/a/app" "$T/b/app"

@@ -158,6 +158,7 @@ first interrupt.
 
 ```bash
 # Application really is at the offset you think
+CROSS_PREFIX="$(mcu --cross-prefix)"   # per project (run from the project directory)
 ${CROSS_PREFIX}objdump -h build/firmware.elf | grep -E 'isr_vector|\.text'
 
 # First word is a plausible stack pointer, second a Thumb address (odd)

@@ -15,7 +15,8 @@
 #
 # Env vars:
 #   DEV_IMAGE=<name>       image tag              (default: dev-template)
-#   DEV_CONTAINER=<name>   running container name (default: dev)
+#   DEV_CONTAINER=<name>   running container name (default: dev-<project>-<hash>, so two
+#                          projects can run side by side)
 #   DEV_NO_BUILD=1         skip docker build
 #   DEV_NO_PULL=1          don't --pull the base image (offline / pin)
 #   DEV_REBUILD=1          docker build --no-cache
@@ -51,7 +52,6 @@
 set -euo pipefail
 
 IMAGE_NAME="${DEV_IMAGE:-dev-template}"
-CONTAINER_NAME="${DEV_CONTAINER:-dev}"
 WORKSPACE_ARG="${1:-$(pwd)}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -79,6 +79,9 @@ workspace_mount_name() {
 
 WORKSPACE="$(cd "$WORKSPACE_ARG" && pwd -P)"
 WS_MOUNT="/workspaces/$(workspace_mount_name "$WORKSPACE")"
+# Per-project default: a fixed name would make a second project fail with a docker
+# name conflict. The "dev-" prefix also guarantees a valid leading character.
+CONTAINER_NAME="${DEV_CONTAINER:-dev-${WS_MOUNT#/workspaces/}}"
 
 if [ "$PRINT" != "1" ] && [ "${DEV_NO_BUILD:-0}" != "1" ]; then
     BUILD_FLAGS=()
@@ -304,6 +307,7 @@ CMD_ARGS=()
 DOCKER_ARGV=(
     run --rm -it
     --name "$CONTAINER_NAME"
+    --label dev.attach=1
     --init
     -w "$WS_MOUNT"
     "${MOUNTS[@]}"

@@ -162,6 +162,7 @@ ELF="${ELF:-build/firmware.elf}"
 PC=0x08001234
 
 # Function + file:line
+CROSS_PREFIX="$(mcu --cross-prefix)"   # per project (run from the project directory)
 ${CROSS_PREFIX}addr2line -f -C -e "$ELF" $PC
 
 # Disassemble around it — the faulting instruction and its neighbours

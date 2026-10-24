@@ -67,7 +67,8 @@ own directory; Claude keeps an optional `.dev-components.json` at the root
 - `/dev/bus/usb`, `/dev/input`, `/dev/snd` are bind-mounted live, with wildcard
   device-cgroup rules, so any probe works (libusb) regardless of vendor/product ID.
 - `ttyACM*`, `ttyUSB*`, `hidraw*` are flat in `/dev`: `scripts/dev-attach.sh attach /dev/ttyUSB0`
-  (or `detach`) mknods them into the running container; the udev rule from
+  (or `detach`) mknods them into every running container labelled `dev.attach=1` (which
+  `dev-up.sh` sets; `DEV_CONTAINER=<name>` targets just one); the udev rule from
   `sudo scripts/install-host-udev-rules.sh` does it on every hotplug.
 - Bluetooth uses the host's bluetoothd through the system D-Bus socket.
 - Probe permissions are a HOST concern: run the udev installer once.
@@ -93,6 +94,18 @@ One thing to know: `trail init` reads your past Claude sessions for the repo (us
 under your login, so it counts toward your usage) and the review comments on the last 50
 merged PRs through `gh`. None of it goes to Trail.
 
+## Migrating from the old images
+
+- **Re-run `sudo scripts/install-host-udev-rules.sh`.** A host that still has the old arm
+  rule installed points at the old checkout's helper (container `dev-emb-arm`); hotplug
+  stops reaching the new containers until the rule is replaced.
+- Containers are now named `dev-<project>-<hash>`; scripts that used `dev-emb-arm`,
+  `dev-web` etc. need `DEV_CONTAINER=` or the new name.
+- Old container-only Claude state (prompt history, sessions) is not migrated: copy it into
+  `~/.claude-dev` (`DEV_STATE_DIR`) if you want it.
+- The devcontainer now mounts the Telink SDK, CubeCLT and CubeWBA from `~/telink` and `~/st`
+  (the folders are created empty if missing; `dev-doctor` then reports "not mounted").
+
 ## Persistence
 
 Across `--rm` runs: login, `projects/` and memory (shared with the host's `~/.claude`),
@@ -104,7 +117,7 @@ are baked into the image. Package caches are named volumes (`dev-cache-*`).
 
 | Variable | Effect |
 |---|---|
-| `DEV_IMAGE`, `DEV_CONTAINER` | local tag (`dev-template`) and container name (`dev`) |
+| `DEV_IMAGE`, `DEV_CONTAINER` | local tag (`dev-template`) and container name (default `dev-<project>-<hash>`, so two projects can run side by side) |
 | `DEV_NO_BUILD`, `DEV_NO_PULL`, `DEV_REBUILD` | skip the build / skip `--pull` / `--no-cache` |
 | `DEV_NO_CACHE_VOLUMES`, `DEV_SKIP_UPDATE` | no cache volumes / skip `claude update` at start |
 | `DEV_DOCTOR` | run `dev-doctor` and exit |

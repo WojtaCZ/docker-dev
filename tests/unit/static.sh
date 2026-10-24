@@ -26,6 +26,19 @@ for ext in marus25.cortex-debug mcu-debug.peripheral-viewer llvm-vs-code-extensi
 done
 lacks "$DC" 'BASE_TAG'
 
+# vendor tooling must not be silently dropped from the devcontainer (it was in the telink child)
+for needle in '/opt/telink/sdk' '/opt/st/clt' '/opt/st/cubewba' 'telink/Telink_825X_SDK' 'st/STM32CubeCLT' 'st/cubewba'; do
+    has "$DC" "$needle"
+done
+
+# the SessionStart hook must be bounded (trail init can call Claude headlessly for minutes)
+python3 - <<'PY' && ok "SessionStart hook has a matcher and a timeout" || bad "SessionStart hook lacks matcher/timeout"
+import json, sys
+h = json.load(open("claude-baseline/settings.json"))["hooks"]["SessionStart"][0]
+cmd = h["hooks"][0]
+sys.exit(0 if h.get("matcher") and isinstance(cmd.get("timeout"), int) and 0 < cmd["timeout"] <= 300 and cmd["command"] == "trail-ensure" else 1)
+PY
+
 P=.github/workflows/publish.yml
 has "$P" 'schedule:'
 has "$P" 'images: ghcr.io/${{ github.repository }}'
@@ -39,7 +52,7 @@ has .github/workflows/promote-stable.yml 'schedule:'
 lacks Dockerfile 'ENV CROSS_PREFIX'
 if grep -nE '^(ENV|ARG)[[:space:]].*CROSS_PREFIX' Dockerfile >/dev/null; then bad "Dockerfile sets CROSS_PREFIX"; else ok "Dockerfile sets no CROSS_PREFIX"; fi
 
-for needle in '.no-trail' 'DEV_TRAIL' 'past Claude sessions' 'dev-attach' 'DEV_STATE_DIR' \
+for needle in 'Migrating from the old images' 'install-host-udev-rules.sh' 'dev.attach' '.no-trail' 'DEV_TRAIL' 'past Claude sessions' 'dev-attach' 'DEV_STATE_DIR' \
               'mcu --cross-prefix' '/workspaces/' '.dev-components.json' 'DEV_TELINK_SDK' 'DEV_PORTS'; do
     has README.md "$needle"
 done

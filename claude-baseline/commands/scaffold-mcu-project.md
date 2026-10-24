@@ -199,6 +199,7 @@ mcu size                   # fits the declared budget
 Confirm the binary is for the right core:
 
 ```bash
+CROSS_PREFIX="$(mcu --cross-prefix)"   # per project (run from the project directory)
 ${CROSS_PREFIX}readelf -A build/firmware.elf | grep -E 'Tag_CPU_name|Tag_CPU_arch|Tag_FP_arch'
 ```
 

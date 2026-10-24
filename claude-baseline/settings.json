@@ -66,10 +66,12 @@
     "hooks": {
         "SessionStart": [
             {
+                "matcher": "startup|resume",
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "trail-ensure"
+                        "command": "trail-ensure",
+                        "timeout": 120
                     }
                 ]
             }

@@ -40,11 +40,16 @@ dirty() { git -C "$1" diff --name-only 2>/dev/null | sort; }
 
 run_trail() { # root args...   -> sets TRAIL_RC; runs in root
     local root="$1"; shift
-    ( cd "$root" && trail "$@" >/dev/null 2>&1 )
+    ( cd "$root" && trail "$@" >/dev/null 2>&1 </dev/null )
     TRAIL_RC=$?
 }
 
 top="$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null || true)"
+
+if [ -n "$top" ] && [ -e "$top/.no-trail" ]; then
+    say "disabled (.no-trail in $top)"
+    exit 0
+fi
 
 if [ -n "$top" ]; then
     before="$(dirty "$top")"
@@ -96,16 +101,50 @@ if [ "${#children[@]}" -eq 0 ]; then
     exit 0
 fi
 
-run_trail "$dir" build
-if [ "$TRAIL_RC" -ne 0 ]; then
-    say "trail build failed at $dir (exit $TRAIL_RC); continuing without it"
+# A child with .no-trail must be left completely alone. A parent-level build would
+# map it too, so it is skipped as soon as any child opted out; the other children are
+# then handled one by one.
+active=(); optedout=0
+for c in "${children[@]}"; do
+    if [ -e "$c/.no-trail" ]; then optedout=$((optedout + 1)); else active+=("$c"); fi
+done
+if [ "${#active[@]}" -eq 0 ]; then
+    say "disabled (.no-trail in every child repo of $dir)"
     exit 0
 fi
-inited=0
-for c in "${children[@]}"; do
-    [ -d "$c/.trail" ] && continue
-    run_trail "$c" init --agents claude --yes
-    [ "$TRAIL_RC" -eq 0 ] && inited=$((inited + 1))
+
+parent_built=0
+if [ "$optedout" -eq 0 ]; then
+    run_trail "$dir" build
+    if [ "$TRAIL_RC" -ne 0 ]; then
+        say "trail build failed at $dir (exit $TRAIL_RC); continuing without it"
+        exit 0
+    fi
+    parent_built=1
+fi
+
+done_n=0; changed_all=""
+for c in "${active[@]}"; do
+    before="$(dirty "$c")"
+    if [ -d "$c/.trail" ]; then
+        # With a parent build the child map is already covered; alone it needs its own.
+        [ "$parent_built" -eq 1 ] && continue
+        run_trail "$c" build
+    else
+        run_trail "$c" init --agents claude --yes
+    fi
+    if [ "$TRAIL_RC" -eq 0 ]; then
+        done_n=$((done_n + 1))
+        after="$(dirty "$c")"
+        new="$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | grep . || true)"
+        for f in $new; do changed_all="$changed_all ${c#"$dir"/}/$f"; done
+    fi
 done
-say "build at $dir and init in $inited of ${#children[@]} child repo(s) (nothing committed)"
+
+msg="set up ${done_n} of ${#active[@]} child repo(s) in $dir"
+[ "$parent_built" -eq 1 ] && msg="parent build done; $msg"
+[ "$optedout" -gt 0 ] && msg="$msg, skipped $optedout with .no-trail (no parent build)"
+msg="$msg (nothing committed)"
+[ -n "$changed_all" ] && msg="$msg. Already-tracked files modified:${changed_all}"
+say "$msg"
 exit 0

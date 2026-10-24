@@ -12,6 +12,7 @@ mkdir -p "$T/bin"
 cat > "$T/bin/trail" <<'STUB'
 #!/bin/sh
 echo "$PWD|$*" >> "$TRAIL_LOG"
+[ -n "${TRAIL_STDIN_LOG:-}" ] && cat >> "$TRAIL_STDIN_LOG"
 [ -n "${TRAIL_STUB_TOUCH:-}" ] && echo '{}' >> "$PWD/$TRAIL_STUB_TOUCH"
 [ -n "${TRAIL_STUB_FAIL:-}" ] && exit 1
 exit 0
@@ -72,6 +73,30 @@ head_before="$(git -C "$T/mcp" rev-parse HEAD)"
 check "HEAD unchanged (never commits)" "$head_before" "$(git -C "$T/mcp" rev-parse HEAD)"
 case "$OUT" in *".mcp.json"*) check "reports changed pre-existing file" ok ok ;; *) check "reports changed pre-existing file" "mentions .mcp.json" "$OUT" ;; esac
 check "nothing staged" "" "$(git -C "$T/mcp" diff --cached --name-only)"
+
+# --- review fixes: opt-out honoured everywhere, folder-of-repos reporting, stdin ---
+mkrepo "$T/optroot"; touch "$T/optroot/.no-trail"; mkdir -p "$T/optroot/sub/deep"
+run "$T/optroot/sub/deep"; check ".no-trail at the repo root is honoured from a subdirectory" "" "$LOG"
+run "$T/optroot/sub"; check ".no-trail at the repo root, session in sub" "" "$LOG"
+
+mkdir "$T/part"; mkrepo "$T/part/r1"; mkrepo "$T/part/r2"; touch "$T/part/r1/.no-trail"
+run "$T/part"
+check "child with .no-trail: no parent build, opted-out child skipped, other child init" \
+    "part/r2|init --agents claude --yes;" "$LOG"
+
+: > "$TRAIL_LOG"; OUT="$("$ENSURE" "$T/part" 2>&1)"
+case "$OUT" in *"parent build done"*) check "summary does not claim a skipped parent build" "no claim" "$OUT" ;; *) check "summary does not claim a skipped parent build" ok ok ;; esac
+
+mkdir "$T/rep"; mkrepo "$T/rep/c1"; echo base > "$T/rep/c1/.gitignore"
+(cd "$T/rep/c1" && git add .gitignore && git commit -qm gi)
+: > "$TRAIL_LOG"; OUT="$(TRAIL_STUB_TOUCH=.gitignore "$ENSURE" "$T/rep" 2>&1)"
+case "$OUT" in *"c1/.gitignore"*) check "folder of repos reports modified tracked files" ok ok ;;
+    *) check "folder of repos reports modified tracked files" "mentions c1/.gitignore" "$OUT" ;; esac
+oneline || { echo "FAIL: folder-of-repos output not one line: $OUT" >&2; fails=$((fails+1)); }
+
+mkrepo "$T/stdin"; : > "$T/stdin.log"
+: > "$TRAIL_LOG"; echo SECRET-HOOK-INPUT | TRAIL_STDIN_LOG="$T/stdin.log" "$ENSURE" "$T/stdin" >/dev/null 2>&1
+check "hook stdin is not passed on to trail" "" "$(cat "$T/stdin.log")"
 
 [ "$fails" -eq 0 ] || { echo "$fails failure(s)" >&2; exit 1; }
 echo "trail-ensure: all passed"

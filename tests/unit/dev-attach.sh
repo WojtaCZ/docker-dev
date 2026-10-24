@@ -15,6 +15,7 @@ cat > "$T/bin/docker" <<'STUB'
 #!/bin/sh
 echo "$*" >> "$DOCKER_LOG"
 [ "$1" = inspect ] && echo "${STUB_RUNNING:-true}"
+[ "$1" = ps ] && [ -n "${STUB_PS:-}" ] && printf "%s\n" ${STUB_PS}
 exit 0
 STUB
 chmod +x "$T/bin/docker"
@@ -24,21 +25,29 @@ A="$ROOT/scripts/dev-attach.sh"
 sudo mknod -m 660 "$NODE" c 1 3 || { echo "FAIL: cannot create fake $NODE (sudo mknod)" >&2; exit 1; }
 read -r mode gid < <(stat -c '%a %g' "$NODE")
 
-: > "$DOCKER_LOG"; out="$("$A" attach "$NODE" 2>&1)"; rc=$?
+# No DEV_CONTAINER: act on EVERY running container carrying the dev.attach label.
+: > "$DOCKER_LOG"; out="$(STUB_PS="dev-a dev-b" "$A" attach "$NODE" 2>&1)"; rc=$?
 check "attach rc" 0 "$rc"
-grep -q "^exec -u root dev sh -c .* _ $NODE $mode 1 3 $gid\$" "$DOCKER_LOG" \
-    && check "attach issues mknod into default container 'dev' with major/minor/mode/gid" ok ok \
-    || check "attach issues mknod into default container 'dev'" "exec -u root dev ... _ $NODE $mode 1 3 $gid" "$(cat "$DOCKER_LOG")"
+check "ps is filtered by the dev.attach label" 1 "$(grep -c '^ps .*label=dev.attach=1' "$DOCKER_LOG")"
+for c in dev-a dev-b; do
+    grep -q "^exec -u root $c sh -c .* _ $NODE $mode 1 3 $gid\$" "$DOCKER_LOG" \
+        && check "attach issues mknod into $c with major/minor/mode/gid" ok ok \
+        || check "attach issues mknod into $c" "exec -u root $c ... _ $NODE $mode 1 3 $gid" "$(cat "$DOCKER_LOG")"
+done
+: > "$DOCKER_LOG"; out="$(STUB_PS="" "$A" attach "$NODE" 2>&1)"; rc=$?
+check "no labelled container running -> rc 0" 0 "$rc"
+case "$out" in info:*) check "no labelled container -> info" ok ok ;; *) check "no labelled container -> info" "info:" "$out" ;; esac
+check "no labelled container -> no exec" 0 "$(grep -c '^exec' "$DOCKER_LOG")"
 
 : > "$DOCKER_LOG"; DEV_CONTAINER=other "$A" attach "$NODE" >/dev/null 2>&1
 grep -q "^exec -u root other " "$DOCKER_LOG" && check "DEV_CONTAINER overrides" ok ok || check "DEV_CONTAINER overrides" "exec -u root other" "$(cat "$DOCKER_LOG")"
 
-: > "$DOCKER_LOG"; "$A" detach "$NODE" >/dev/null 2>&1
+: > "$DOCKER_LOG"; DEV_CONTAINER=dev "$A" detach "$NODE" >/dev/null 2>&1
 grep -q "^exec -u root dev rm -f $NODE\$" "$DOCKER_LOG" && check "detach removes node" ok ok || check "detach removes node" "exec -u root dev rm -f $NODE" "$(cat "$DOCKER_LOG")"
 
-out="$("$A" attach /dev/null 2>&1)"; case "$out" in skip:*) check "non-matching node skipped" ok ok ;; *) check "non-matching node skipped" "skip:" "$out" ;; esac
+out="$(STUB_PS=dev-a "$A" attach /dev/null 2>&1)"; case "$out" in skip:*) check "non-matching node skipped" ok ok ;; *) check "non-matching node skipped" "skip:" "$out" ;; esac
 
-: > "$DOCKER_LOG"; out="$(STUB_RUNNING=false "$A" attach "$NODE" 2>&1)"; rc=$?
+: > "$DOCKER_LOG"; out="$(STUB_RUNNING=false DEV_CONTAINER=dev "$A" attach "$NODE" 2>&1)"; rc=$?
 check "container not running -> rc 0" 0 "$rc"
 case "$out" in info:*) check "container not running -> info" ok ok ;; *) check "container not running -> info" "info:" "$out" ;; esac
 check "container not running -> no exec" 0 "$(grep -c '^exec' "$DOCKER_LOG")"

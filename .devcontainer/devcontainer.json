@@ -7,7 +7,7 @@
     "remoteUser": "dev",
     "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
     "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind,consistency=cached",
-    "initializeCommand": "mkdir -p \"$HOME/.claude/projects\" \"$HOME/.trail\" \"$HOME/.claude-dev/file-history\" \"$HOME/.claude-dev/backups\" \"$HOME/.claude-dev/sessions\" \"$HOME/.claude-dev/session-env\" \"$HOME/.claude-dev/shell-snapshots\" && touch \"$HOME/.claude.json\" \"$HOME/.claude/.credentials.json\" \"$HOME/.claude-dev/history.jsonl\"",
+    "initializeCommand": "mkdir -p \"$HOME/.claude/projects\" \"$HOME/.trail\" \"$HOME/telink/Telink_825X_SDK\" \"$HOME/st/STM32CubeCLT\" \"$HOME/st/cubewba\" \"$HOME/.claude-dev/file-history\" \"$HOME/.claude-dev/backups\" \"$HOME/.claude-dev/sessions\" \"$HOME/.claude-dev/session-env\" \"$HOME/.claude-dev/shell-snapshots\" && touch \"$HOME/.claude.json\" \"$HOME/.claude/.credentials.json\" \"$HOME/.claude-dev/history.jsonl\"",
     "mounts": [
         "source=${localEnv:HOME}/.claude.json,target=/home/dev/.claude.json,type=bind",
         "source=${localEnv:HOME}/.claude/.credentials.json,target=/home/dev/.claude/.credentials.json,type=bind",
@@ -20,6 +20,9 @@
         "source=${localEnv:HOME}/.claude-dev/shell-snapshots,target=/home/dev/.claude/shell-snapshots,type=bind",
         "source=${localEnv:HOME}/.trail,target=/home/dev/.trail,type=bind",
         "source=/dev/bus/usb,target=/dev/bus/usb,type=bind",
+        "source=${localEnv:HOME}/telink/Telink_825X_SDK,target=/opt/telink/sdk,type=bind,readonly",
+        "source=${localEnv:HOME}/st/STM32CubeCLT,target=/opt/st/clt,type=bind,readonly",
+        "source=${localEnv:HOME}/st/cubewba,target=/opt/st/cubewba,type=bind,readonly",
         "source=dev-cache-npm,target=/home/dev/.npm,type=volume",
         "source=dev-cache-uv,target=/home/dev/.cache/uv,type=volume",
         "source=dev-cache-cargo,target=/home/dev/.cargo,type=volume",
