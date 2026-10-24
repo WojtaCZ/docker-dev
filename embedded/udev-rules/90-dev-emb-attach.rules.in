@@ -10,3 +10,5 @@ ACTION=="add",    SUBSYSTEM=="tty",    KERNEL=="ttyACM[0-9]*", RUN+="/usr/bin/sy
 ACTION=="add",    SUBSYSTEM=="hidraw", KERNEL=="hidraw[0-9]*", RUN+="/usr/bin/systemd-run --no-block --collect @DEV_ATTACH@ attach /dev/%k"
 ACTION=="remove", SUBSYSTEM=="tty",    KERNEL=="ttyACM[0-9]*", RUN+="/usr/bin/systemd-run --no-block --collect @DEV_ATTACH@ detach /dev/%k"
 ACTION=="remove", SUBSYSTEM=="hidraw", KERNEL=="hidraw[0-9]*", RUN+="/usr/bin/systemd-run --no-block --collect @DEV_ATTACH@ detach /dev/%k"
+ACTION=="add",    SUBSYSTEM=="tty",    KERNEL=="ttyUSB[0-9]*", RUN+="/usr/bin/systemd-run --no-block --collect @DEV_ATTACH@ attach /dev/%k"
+ACTION=="remove", SUBSYSTEM=="tty",    KERNEL=="ttyUSB[0-9]*", RUN+="/usr/bin/systemd-run --no-block --collect @DEV_ATTACH@ detach /dev/%k"

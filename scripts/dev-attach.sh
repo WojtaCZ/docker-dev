@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Add or remove flat /dev nodes (ttyACM*, hidraw*) in the RUNNING dev container.
+# Add or remove flat /dev nodes (ttyACM*, ttyUSB*, hidraw*) in the RUNNING dev container.
 #
 # Usage:
 #   ./scripts/dev-attach.sh attach /dev/ttyACM3 [/dev/hidraw2 ...]
 #   ./scripts/dev-attach.sh detach /dev/ttyACM3
 #
 # Env vars:
-#   DEV_CONTAINER=<name>   running container name (default: dev-emb-arm)
+#   DEV_CONTAINER=<name>   running container name (default: dev)
 #
 # Why this exists: /dev/bus/usb, /dev/input and /dev/snd are bind-mounted as live
-# directories by dev-up.sh, so nodes under them appear on their own. ttyACM and
-# hidraw nodes are flat in /dev and can't be mounted that way. dev-up.sh does
+# directories by dev-up.sh, so nodes under them appear on their own. ttyACM,
+# ttyUSB and hidraw nodes are flat in /dev and can't be mounted that way. dev-up.sh does
 # grant the container's device cgroup a wildcard on their major numbers, so the
 # only thing missing for a node that appears later is the node itself — which is
 # a mknod away. This does that mknod as root inside the container, copying the
@@ -26,7 +26,7 @@
 
 set -uo pipefail
 
-CONTAINER="${DEV_CONTAINER:-dev-emb-arm}"
+CONTAINER="${DEV_CONTAINER:-dev}"
 ACTION="${1:-}"
 shift || true
 

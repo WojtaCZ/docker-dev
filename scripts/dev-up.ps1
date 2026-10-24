@@ -1,108 +1,80 @@
 <#
 .SYNOPSIS
-    Headless build + run for the baseline dev container on Windows.
+    WSL shim: delegates to scripts/dev-up.sh running inside WSL2.
 
 .DESCRIPTION
-    Builds the image (unless -NoBuild) and drops you into an interactive shell
-    inside the container with /workspace bind-mounted to -Workspace (default:
-    current directory), shared Claude auth, persistent package caches, and
-    Docker Desktop's SSH agent forwarding.
+    USB probe passthrough requires Linux device nodes, so the real work happens in
+    WSL2. Attach the probe to WSL first with usbipd:
 
-.PARAMETER Workspace
-    Host directory to mount at /workspace. Defaults to the current directory.
+        usbipd list
+        usbipd bind   --busid <busid>
+        usbipd attach --wsl --busid <busid>
 
-.PARAMETER NoBuild
-    Skip `docker build` and just run the existing image.
+    Then run this script. /dev/bus/usb, /dev/input and /dev/snd are bind-mounted
+    live with wildcard device-cgroup rules, so probes and input/MIDI devices attached
+    to WSL AFTER the container is running are picked up with no restart. Flat nodes
+    (/dev/ttyACM*, /dev/ttyUSB*, /dev/hidraw*) are mknod'd in by scripts/dev-attach.sh
+    (once at start; run it again after a replug). usbipd attach is still needed once
+    per device per WSL boot; that step is what gets it into WSL's kernel at all and is
+    outside the container's control.
 
-.PARAMETER NoPull
-    Skip `--pull` (don't refresh base image layers). Useful offline or when pinning.
-
-.PARAMETER Rebuild
-    Force `docker build --no-cache` for a clean rebuild.
-
-.PARAMETER NoCacheVolumes
-    Don't mount the persistent npm/uv/cargo cache volumes.
-
-.PARAMETER SkipUpdate
-    Skip `claude update` on container start (faster cold start, works offline).
-
-.PARAMETER Doctor
-    Run dev-doctor and exit instead of opening an interactive shell.
+    The project is mounted at /workspaces/<name>-<hash> inside the container.
 
 .EXAMPLE
     .\scripts\dev-up.ps1
-    .\scripts\dev-up.ps1 -Workspace C:\code\my-project
-    .\scripts\dev-up.ps1 -Rebuild
+    .\scripts\dev-up.ps1 -Workspace C:\code\firmware -Rebuild
     .\scripts\dev-up.ps1 -Doctor
+    .\scripts\dev-up.ps1 -Ports "3000 8080" -NoTrail
 #>
 [CmdletBinding()]
 param(
     [string]$Workspace = (Get-Location).Path,
-    [string]$ImageName = "dev-template-baseline",
-    [string]$ContainerName = "dev-template",
+    [string]$Image,
+    [string]$Container,
     [switch]$NoBuild,
     [switch]$NoPull,
     [switch]$Rebuild,
     [switch]$NoCacheVolumes,
     [switch]$SkipUpdate,
-    [switch]$Doctor
+    [switch]$Doctor,
+    [switch]$NoTrail,
+    [switch]$NoServices,
+    [string]$Probe,
+    [string]$Ports,
+    [string]$Assets,
+    [string]$StateDir,
+    [string]$TelinkSdk,
+    [string]$CubeClt,
+    [string]$CubeWba
 )
 
 $ErrorActionPreference = "Stop"
-$repoRoot = Split-Path -Parent $PSScriptRoot
 
-if (-not $NoBuild) {
-    $buildFlags = @()
-    if (-not $NoPull) { $buildFlags += "--pull" }
-    if ($Rebuild)     { $buildFlags += "--no-cache" }
-    docker build @buildFlags -t $ImageName $repoRoot
-    if ($LASTEXITCODE -ne 0) { throw "docker build failed" }
-}
+$env:DEV_NO_BUILD         = if ($NoBuild)         { "1" } else { "0" }
+$env:DEV_NO_PULL          = if ($NoPull)          { "1" } else { "0" }
+$env:DEV_REBUILD          = if ($Rebuild)         { "1" } else { "0" }
+$env:DEV_NO_CACHE_VOLUMES = if ($NoCacheVolumes)  { "1" } else { "0" }
+$env:DEV_SKIP_UPDATE      = if ($SkipUpdate)      { "1" } else { "0" }
+$env:DEV_DOCTOR           = if ($Doctor)          { "1" } else { "0" }
+$env:DEV_NO_SERVICES      = if ($NoServices)      { "1" } else { "0" }
+$env:DEV_TRAIL            = if ($NoTrail)         { "0" } else { "1" }
+if ($Image)     { $env:DEV_IMAGE      = $Image }
+if ($Container) { $env:DEV_CONTAINER  = $Container }
+if ($Probe)     { $env:DEV_PROBE      = $Probe }
+if ($Ports)     { $env:DEV_PORTS      = $Ports }
+if ($Assets)    { $env:DEV_ASSETS     = $Assets }
+if ($StateDir)  { $env:DEV_STATE_DIR  = $StateDir }
+if ($TelinkSdk) { $env:DEV_TELINK_SDK = $TelinkSdk }
+if ($CubeClt)   { $env:DEV_CUBECLT    = $CubeClt }
+if ($CubeWba)   { $env:DEV_CUBEWBA    = $CubeWba }
 
-$claudeJson = Join-Path $env:USERPROFILE ".claude.json"
-$claudeDir  = Join-Path $env:USERPROFILE ".claude"
+# WSLENV makes these visible to the Linux side of the call.
+$env:WSLENV = "DEV_NO_BUILD:DEV_NO_PULL:DEV_REBUILD:DEV_NO_CACHE_VOLUMES:" +
+              "DEV_SKIP_UPDATE:DEV_DOCTOR:DEV_NO_SERVICES:DEV_TRAIL:" +
+              "DEV_IMAGE:DEV_CONTAINER:DEV_PROBE:DEV_PORTS:DEV_ASSETS:DEV_STATE_DIR:" +
+              "DEV_TELINK_SDK:DEV_CUBECLT:DEV_CUBEWBA"
 
-if (-not (Test-Path $claudeJson)) {
-    Write-Warning "$claudeJson not found. Run 'claude' on the host at least once so auth exists."
-}
-if (-not (Test-Path $claudeDir)) {
-    New-Item -ItemType Directory -Path $claudeDir | Out-Null
-}
+$wslWorkspace = wsl --exec wslpath -a $Workspace
+if ($LASTEXITCODE -ne 0) { throw "could not translate '$Workspace' to a WSL path" }
 
-$dockerArgs = @(
-    "run", "--rm", "-it",
-    "--name", $ContainerName,
-    "--init",
-    "-v", "${Workspace}:/workspace",
-    "-v", "${claudeJson}:/host-claude-auth.json",
-    "-v", "${claudeDir}:/host-claude-dir"
-)
-
-# Persistent package caches — without these every --rm run re-downloads
-# npm/uv/cargo content from scratch.
-if (-not $NoCacheVolumes) {
-    $dockerArgs += @(
-        "-v", "dev-cache-npm:/home/dev/.npm",
-        "-v", "dev-cache-uv:/home/dev/.cache/uv",
-        "-v", "dev-cache-cargo:/home/dev/.cargo",
-        "-v", "dev-cache-pkg:/home/dev/.cache/pkg"
-    )
-}
-
-if ($SkipUpdate) { $dockerArgs += @("-e", "DEV_SKIP_UPDATE=1") }
-if ($env:GITHUB_TOKEN) { $dockerArgs += @("-e", "GITHUB_TOKEN=$($env:GITHUB_TOKEN)") }
-
-# Docker Desktop on Windows exposes the host ssh-agent at this magic socket.
-# Requires the Windows OpenSSH Authentication Agent service to be running.
-$dockerArgs += @(
-    "-v", "/run/host-services/ssh-auth.sock:/ssh-agent",
-    "-e", "SSH_AUTH_SOCK=/ssh-agent",
-    $ImageName
-)
-
-# Docker Desktop's Linux VM always presents bind mounts as uid 1000, so the
-# HOST_UID remap that dev-up.sh performs is not needed on Windows.
-
-if ($Doctor) { $dockerArgs += "dev-doctor" }
-
-& docker @dockerArgs
+wsl --cd "$PSScriptRoot/.." -- bash scripts/dev-up.sh $wslWorkspace

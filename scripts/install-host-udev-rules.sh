@@ -9,7 +9,7 @@
 # install them on the host, including when you only have the image and not a
 # repo checkout:
 #
-#   docker run --rm ghcr.io/wojtacz/docker-dev-embedded-base:latest \
+#   docker run --rm ghcr.io/wojtacz/docker-dev-template:latest \
 #       tar -C /opt/embedded -c udev-rules | tar -x -C /tmp
 #   sudo /tmp/udev-rules/../install-host-udev-rules.sh
 #
@@ -20,9 +20,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RULES_DEST="/etc/udev/rules.d"
 
-# Locate the rules whether we are in a repo checkout (../udev-rules) or running
-# the copy baked into the image (/opt/embedded/udev-rules).
+# Locate the rules whether we are in a repo checkout (../embedded/udev-rules) or
+# running the copy baked into the image (/opt/embedded/udev-rules).
 for candidate in \
+    "$SCRIPT_DIR/../embedded/udev-rules" \
     "$SCRIPT_DIR/../udev-rules" \
     "$SCRIPT_DIR/udev-rules" \
     "/opt/embedded/udev-rules"
