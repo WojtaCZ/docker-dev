@@ -120,7 +120,7 @@ for k in json.load(sys.stdin).get("mcpServers", {}):
     for b in wlink wchisp riscv-none-elf-gcc arm-none-eabi-gcc arm-none-eabi-gdb \
              openocd probe-rs pyocd st-info sigrok-cli bluetoothctl php composer \
              deno bun chromium nginx mcu web svd-find build-cmsis-dsp ch58x-sdk \
-             trail trail-ensure dev-attach clang cmake ninja gdb; do
+             trail trail-ensure work-notes dev-attach clang cmake ninja gdb; do
         echo "bin|$b|"
     done
     for dir in /opt/cmsis /opt/cmsis-dsp /opt/svd /opt/st/cmsis /opt/riscv \

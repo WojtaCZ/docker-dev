@@ -74,6 +74,27 @@
                         "timeout": 120
                     }
                 ]
+            },
+            {
+                "matcher": "startup|resume|compact",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "work-notes resume",
+                        "timeout": 10
+                    }
+                ]
+            }
+        ],
+        "SubagentStart": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "work-notes subagent",
+                        "timeout": 10
+                    }
+                ]
             }
         ]
     }

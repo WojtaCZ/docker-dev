@@ -94,6 +94,15 @@ One thing to know: `trail init` reads your past Claude sessions for the repo (us
 under your login, so it counts toward your usage) and the review comments on the last 50
 merged PRs through `gh`. None of it goes to Trail.
 
+## Work notes
+
+Claude keeps notes of what it is doing in `<project>/.claude-notes/` (`progress.md` for the
+main session, `agents/<name>.md` per subagent), so a usage limit or a container crash does
+not lose the thread: a SessionStart hook replays `progress.md` on start, resume and compact,
+and a SubagentStart hook tells each subagent where to write. The folder is inside the
+bind-mounted project (survives anything), added to `.git/info/exclude` (never committed,
+never shows as a change). Opt out with an empty `.no-notes` file or `DEV_NOTES=0`.
+
 ## Migrating from the old images
 
 - **Re-run `sudo scripts/install-host-udev-rules.sh`.** A host that still has the old arm

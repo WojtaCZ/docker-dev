@@ -296,9 +296,11 @@ COPY scripts/dev-doctor.sh  /usr/local/bin/dev-doctor
 COPY scripts/web-post-create.sh /usr/local/bin/web-post-create.sh
 COPY scripts/dev-attach.sh  /usr/local/bin/dev-attach
 COPY scripts/trail-ensure.sh /usr/local/bin/trail-ensure
+COPY scripts/work-notes.sh  /usr/local/bin/work-notes
 RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/post-create.sh \
              /usr/local/bin/dev-doctor /usr/local/bin/web-post-create.sh \
-             /usr/local/bin/dev-attach /usr/local/bin/trail-ensure
+             /usr/local/bin/dev-attach /usr/local/bin/trail-ensure \
+             /usr/local/bin/work-notes
 
 # Embedded: profile task runner (`mcu`), per-target profiles, schema, shared CMake
 # helpers and toolchain files, VSCode starters, svd-find. udev does NOT run inside

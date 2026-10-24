@@ -55,6 +55,22 @@ Trail in the project. It never commits: tell the user which files appeared or ch
 `/trail-setup` does it on demand (e.g. a sub-project added mid-session). A `.no-trail`
 file or `DEV_TRAIL=0` turns it off. Read `.trail/learnings/` before exploring unfamiliar code.
 
+## Work notes (every session, every subagent)
+
+A usage limit or a container crash can end a session at any moment. Keep notes in the
+project so the next session continues instead of rediscovering: `<project>/.claude-notes/`
+(on the host mount, untracked via `.git/info/exclude`; opt out with `.no-notes`).
+
+- **Main session**: `.claude-notes/progress.md`, kept current, not just at the end:
+  goal, done, in progress (the exact step, files, commands), next, decisions and why,
+  open problems. Update it after each meaningful step and before anything long-running
+  (builds, flashing, installs). Rewrite stale parts; keep it short.
+- **Subagents**: each keeps `.claude-notes/agents/<name>.md` (a SubagentStart hook gives
+  the name); the main session owns progress.md. When you spawn one, say what to note.
+- **Start of a session**: the hook prints progress.md. If it describes unfinished work,
+  say so and continue from it; check the repo (`git status`, files) before trusting it.
+- Notes record work state, not secrets.
+
 ## Paths and persistence
 
 - The project is mounted at `/workspaces/<name>-<hash>` (your cwd); `/workspace` is a

@@ -23,6 +23,7 @@ bin|sigrok-cli|
 bin|st-info|
 bin|svd-find|
 bin|trail-ensure|
+bin|work-notes|
 bin|trail|
 bin|wchisp|
 bin|web|

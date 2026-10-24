@@ -55,7 +55,7 @@ echo "== short baseline memory =="
 M="$HOME/.claude/CLAUDE.md"
 lines=$(wc -l < "$M")
 [ "$lines" -le 120 ] || fail "CLAUDE.md is $lines lines (limit 120): platform detail belongs in skills"
-for needle in '.mcu-profile.json' '.web-profile.json' 'dev-components.json' 'MAINTENANCE RULE' 'trail-ensure' '/workspaces/' 'mcu --cross-prefix'; do
+for needle in '.mcu-profile.json' '.web-profile.json' 'dev-components.json' 'MAINTENANCE RULE' 'trail-ensure' '/workspaces/' 'mcu --cross-prefix' '.claude-notes/progress.md'; do
     grep -qF -- "$needle" "$M" || fail "baseline memory does not mention '$needle'"
 done
 ! grep -q 'Fleet inheritance' "$M" || fail "baseline memory still describes the old image fleet"
