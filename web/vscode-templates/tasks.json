@@ -1,0 +1,16 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        { "label": "Install",   "type": "shell", "command": "web install",   "problemMatcher": [] },
+        { "label": "Dev server","type": "shell", "command": "web dev", "isBackground": true,
+          "presentation": { "reveal": "always", "panel": "dedicated" }, "problemMatcher": [] },
+        { "label": "Build",     "type": "shell", "command": "web build",
+          "group": { "kind": "build", "isDefault": true }, "problemMatcher": [] },
+        { "label": "Test",      "type": "shell", "command": "web test",
+          "group": { "kind": "test", "isDefault": true }, "problemMatcher": [] },
+        { "label": "Lint",      "type": "shell", "command": "web lint",      "problemMatcher": [] },
+        { "label": "Typecheck", "type": "shell", "command": "web typecheck", "problemMatcher": [] },
+        { "label": "E2E",       "type": "shell", "command": "web e2e",       "problemMatcher": [] },
+        { "label": "Migrate",   "type": "shell", "command": "web migrate",   "problemMatcher": [] }
+    ]
+}

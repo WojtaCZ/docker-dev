@@ -1,0 +1,84 @@
+# Backing services for docker-dev-web.
+#
+# The image ships DB *clients* (mysql, psql, redis-cli, sqlite3) but nothing to
+# connect to. This brings up the servers on a shared network so those clients —
+# and the db-schema-review skill — can inspect a live schema instead of reading
+# migration files.
+#
+#   docker compose up -d                 # start the services
+#   ./scripts/dev-up.sh                  # auto-joins the network when it exists
+#   docker compose down -v               # stop and wipe the data volumes
+#
+# Hostnames inside the dev container: mariadb, postgres, redis, mailpit.
+
+name: docker-dev-web
+
+services:
+  mariadb:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: dev
+      MARIADB_DATABASE: dev
+      MARIADB_USER: dev
+      MARIADB_PASSWORD: dev
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: dev
+      POSTGRES_USER: dev
+      POSTGRES_DB: dev
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Catches outbound mail so nothing escapes during development.
+  # Web UI on http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+
+volumes:
+  mariadb-data:
+  postgres-data:
+  redis-data:
+
+# Ports bind to 127.0.0.1 only. These services have development-grade
+# credentials and no hardening — do not expose them beyond the loopback
+# interface.
+networks:
+  default:
+    name: docker-dev-web

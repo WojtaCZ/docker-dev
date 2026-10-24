@@ -1,0 +1,4 @@
+# WCH factory USB ISP bootloader (CH5xx / CH32V20x/30x / CH549 ...), used by wchisp.
+# The chip only shows up here while the boot ROM runs (BOOT held at power-up).
+SUBSYSTEM=="usb", ATTRS{idVendor}=="4348", ATTRS{idProduct}=="55e0", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55e0", MODE="0666", GROUP="plugdev"

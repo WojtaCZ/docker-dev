@@ -1,0 +1,39 @@
+{
+    "_note": "Copied to .mcu-profile.json by /scaffold-mcu-project telink. Requires the Telink SDK mounted at /opt/telink/sdk. Full key reference: `mcu --schema`.",
+    "_sdk_mount": "./scripts/dev-up.sh auto-mounts ~/telink/Telink_825X_SDK, or set DEV_TELINK_SDK=<path>.",
+    "_flashTool_guidance": {
+        "tlsr": "Community SWire tools from $TLSR_TOOLS (pvvx/TLSRPGM). Requires dedicated programmer hardware (TB-04-KIT or TLSR8269 running the TLSRPGM firmware), not just a USB-serial adapter. Verify the exact flags with `python3 $TLSR_TOOLS/TlsrPgm.py --help` before trusting these defaults.",
+        "bdt": "Telink's official Burning and Debugging Tool. Windows GUI only \u2014 run it on the host, not here.",
+        "_note": "Unlike the arm and wch leaves there is no first-class, well-supported CLI flasher for TC32. Verify your setup on a scratch board before relying on it."
+    },
+    "chip": "TLSR8258F512ET32",
+    "core": "tc32",
+    "probe": "usb-serial",
+    "flashTool": "tlsr",
+    "SDK": "/opt/telink/sdk",
+    "SDK_PROJECT": ".",
+    "ELF": "build/firmware.elf",
+    "BIN": "build/firmware.bin",
+    "PORT": "/dev/ttyUSB0",
+    "BAUD": "115200",
+    "sizeBudget": {
+        "flash": 524288,
+        "ram": 65536
+    },
+    "testTimeout": 20,
+    "testFail": "(EXCEPTION|PANIC|ASSERT)",
+    "build": "test -x ${SDK}/tools/tc32/bin/tc32-elf-gcc || { echo 'ERROR: Telink SDK not mounted at ${SDK}. Run dev-up.sh with the SDK present, or -v ~/telink/Telink_825X_SDK:/opt/telink/sdk:ro' >&2; exit 1; }; make -j$(nproc) -C ${SDK_PROJECT:-.} TC32_PATH=${SDK}/tools/tc32",
+    "buildDebug": "test -x ${SDK}/tools/tc32/bin/tc32-elf-gcc || { echo 'ERROR: Telink SDK not mounted at ${SDK}.' >&2; exit 1; }; make -j$(nproc) -C ${SDK_PROJECT:-.} TC32_PATH=${SDK}/tools/tc32 DEBUG=1",
+    "hostTest": "cmake -S . -B build-host -G Ninja -DHOST_TESTS=ON && cmake --build build-host && ctest --test-dir build-host --output-on-failure",
+    "clean": "make -C ${SDK_PROJECT:-.} clean",
+    "flash": "test -f ${TLSR_TOOLS}/TlsrPgm.py || { echo \"ERROR: TlsrPgm.py not found under ${TLSR_TOOLS}. In-container flashing needs pvvx/TLSRPGM plus SWire programmer hardware; otherwise flash from the host with Telink BDT.\" >&2; exit 1; }; python3 ${TLSR_TOOLS}/TlsrPgm.py -p${PORT:-/dev/ttyUSB0} -b${PGM_BAUD:-230400} -s -m we ${FLASH_ADDR:-0} ${BIN:-build/firmware.bin}",
+    "erase": "test -f ${TLSR_TOOLS}/TlsrPgm.py || { echo \"ERROR: TlsrPgm.py not found under ${TLSR_TOOLS}. In-container flashing needs pvvx/TLSRPGM plus SWire programmer hardware; otherwise flash from the host with Telink BDT.\" >&2; exit 1; }; python3 ${TLSR_TOOLS}/TlsrPgm.py -p${PORT:-/dev/ttyUSB0} -b${PGM_BAUD:-230400} -s es 0 0x80000",
+    "reset": "test -f ${TLSR_TOOLS}/TlsrPgm.py || { echo \"ERROR: TlsrPgm.py not found under ${TLSR_TOOLS}. In-container flashing needs pvvx/TLSRPGM plus SWire programmer hardware; otherwise flash from the host with Telink BDT.\" >&2; exit 1; }; python3 ${TLSR_TOOLS}/TlsrPgm.py -p${PORT:-/dev/ttyUSB0} -b${PGM_BAUD:-230400} -m i",
+    "serial": "picocom -b ${BAUD:-115200} ${PORT:-/dev/ttyUSB0}",
+    "debugServer": "echo 'TC32 has no supported in-container GDB server. Telink debugging goes through BDT on Windows, or printf/UART tracing.' >&2; exit 1",
+    "postBuild": [
+        "size"
+    ],
+    "PGM_BAUD": "230400",
+    "FLASH_ADDR": "0"
+}

@@ -1,0 +1,59 @@
+{
+    "_note": "Copied to .mcu-profile.json by /scaffold-mcu-project wch <part>. Full key reference: `mcu --schema`. Defaults target CH32V003 with a WCH-Link probe.",
+
+    "_chips": {
+        "ch32v003": { "core": "rv32ec",   "march": "rv32ec_zicsr",   "mabi": "ilp32e", "sizeBudget": { "flash": 16384,  "ram": 2048  }, "_note": "QingKe V2A. 16 KB flash / 2 KB SRAM. RV32EC has only 16 registers." },
+        "ch32v103": { "core": "rv32imac", "march": "rv32imac_zicsr", "mabi": "ilp32",  "sizeBudget": { "flash": 65536,  "ram": 20480 } },
+        "ch32v203": { "core": "rv32imac", "march": "rv32imac_zicsr", "mabi": "ilp32",  "sizeBudget": { "flash": 65536,  "ram": 20480 }, "_note": "QingKe V4B. USB device." },
+        "ch32v303": { "core": "rv32imafc","march": "rv32imafc_zicsr","mabi": "ilp32f", "sizeBudget": { "flash": 131072, "ram": 32768 }, "_note": "QingKe V4F — has a single-precision FPU, so mabi is ilp32f." },
+        "ch32x033": { "core": "rv32imac", "march": "rv32imac_zicsr", "mabi": "ilp32",  "sizeBudget": { "flash": 63488,  "ram": 20480 }, "_note": "QingKe V4C. USB full-speed." }
+    },
+
+    "_flashTool_guidance": {
+        "wlink":  "WCH-Link probe (USB 1a86:8010 / 8012). Flash, erase, reset and a GDB server.",
+        "wchisp": "NO PROBE NEEDED — the factory USB ISP bootloader. Hold BOOT0 while plugging in USB. The fastest path for a board with no debug header."
+    },
+
+    "chip": "CH32V003F4P6",
+    "core": "rv32ec",
+    "march": "rv32ec_zicsr",
+    "mabi": "ilp32e",
+    "probe": "wlink",
+    "flashTool": "wlink",
+
+    "ELF": "build/firmware.elf",
+    "BIN": "build/firmware.bin",
+    "PORT": "/dev/ttyACM0",
+    "BAUD": "115200",
+    "sizeBudget": { "flash": 16384, "ram": 2048 },
+    "testTimeout": 20,
+    "testFail": "(EXCEPTION|PANIC|ASSERT FAILED)",
+
+    "build":      "make -j$(nproc)",
+    "buildDebug": "make -j$(nproc) DEBUG=1",
+    "hostTest":   "cmake -S . -B build-host -G Ninja -DHOST_TESTS=ON && cmake --build build-host && ctest --test-dir build-host --output-on-failure",
+    "clean":      "make clean",
+
+    "flash":      "wlink flash ${BIN:-build/firmware.bin}",
+    "erase":      "wlink erase chip",
+    "reset":      "wlink reset",
+    "debugServer":"wlink gdbserver --port 3333",
+    "serial":     "picocom -b ${BAUD:-115200} ${PORT:-/dev/ttyACM0}",
+
+    "postBuild":  ["size"],
+
+    "_cmake_variant": {
+        "_note": "Swap these in for a CMake project instead of a ch32fun Makefile. Gives you the same tasks.json/launch.json flow as the arm leaf.",
+        "build":      "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=/opt/embedded/cmake/toolchains/riscv-none-elf.cmake -DRISCV_MARCH=${march} -DRISCV_MABI=${mabi} -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && cmake --build build",
+        "buildDebug": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug   -DCMAKE_TOOLCHAIN_FILE=/opt/embedded/cmake/toolchains/riscv-none-elf.cmake -DRISCV_MARCH=${march} -DRISCV_MABI=${mabi} -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && cmake --build build",
+        "clean":      "rm -rf build build-host"
+    },
+
+    "_wchisp_variant": {
+        "_note": "Probe-free flashing over the factory USB bootloader. Hold BOOT0 while connecting USB.",
+        "flash": "wchisp flash ${BIN:-build/firmware.bin}",
+        "erase": "wchisp erase",
+        "reset": "wchisp reset",
+        "debugServer": "echo 'wchisp is a bootloader tool and has no debug server — use wlink with a WCH-Link probe.' && exit 1"
+    }
+}

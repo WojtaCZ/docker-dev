@@ -1,0 +1,31 @@
+{
+    "_note": "CH582F over USB, no probe. Hold BOOT (PB22) while plugging USB, then `mcu flash`. Copy to .mcu-profile.json (or /ch32-new-project CH582F). Makefile must set TARGET:=firmware and TARGET_MCU:=CH582F, and include ch32fun.mk.",
+
+    "chip": "CH582F",
+    "core": "rv32imac",
+    "march": "rv32imac",
+    "mabi": "ilp32",
+    "flashTool": "wchisp",
+
+    "ELF": "firmware.elf",
+    "BIN": "firmware.bin",
+    "PORT": "/dev/ttyACM0",
+    "BAUD": "115200",
+    "sizeBudget": { "flash": 458752, "ram": 32768 },
+    "testTimeout": 20,
+    "testFail": "(EXCEPTION|PANIC|ASSERT FAILED)",
+
+    "build":      "make -j$(nproc) build",
+    "buildDebug": "make -j$(nproc) build",
+    "hostTest":   "cmake -S . -B build-host -G Ninja -DHOST_TESTS=ON && cmake --build build-host && ctest --test-dir build-host --output-on-failure",
+    "clean":      "make clean",
+
+    "flash":      "wchisp flash ${BIN:-firmware.bin}",
+    "erase":      "wchisp erase",
+    "reset":      "wchisp reset",
+    "info":       "wchisp info",
+    "debugServer":"echo 'USB ISP has no debug server. Use a WCH-Link on SWD (enable it first: wchisp config enable-debug) or printf over USB (FUNCONF_USE_USBPRINTF).' && exit 1",
+    "serial":     "picocom -b ${BAUD:-115200} ${PORT:-/dev/ttyACM0}",
+
+    "postBuild":  ["size"]
+}

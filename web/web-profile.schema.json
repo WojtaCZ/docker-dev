@@ -1,0 +1,31 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://github.com/WojtaCZ/docker-dev-web/web-profile.schema.json",
+    "title": ".web-profile.json",
+    "description": "Per-workspace task profile read by /opt/web/run-web-task.sh (aliased as `web`). The web counterpart of the embedded fleet's .mcu-profile.json: one uniform command surface so an agent never has to guess whether this project uses npm, pnpm, bun, deno or composer.",
+    "type": "object",
+    "properties": {
+        "stack":          { "type": "string", "description": "npm | pnpm | yarn | bun | deno | php | mixed" },
+        "packageManager": { "type": "string", "description": "Command used to install and run scripts." },
+        "nodeVersion":    { "type": "string" },
+        "phpVersion":     { "type": "string" },
+        "devPort":        { "type": ["string", "integer"], "description": "Port the dev server binds. Publish it with dev-up.sh's DEV_PORTS." },
+        "dbUrl":          { "type": "string", "description": "Connection string for the migrate/seed tasks." },
+
+        "install":   { "type": "string", "description": "Install dependencies." },
+        "dev":       { "type": "string", "description": "Run the dev server (foreground)." },
+        "build":     { "type": "string", "description": "Production build." },
+        "start":     { "type": "string", "description": "Run the production build." },
+        "test":      { "type": "string", "description": "Unit tests." },
+        "testWatch": { "type": "string" },
+        "lint":      { "type": "string" },
+        "format":    { "type": "string" },
+        "typecheck": { "type": "string" },
+        "e2e":       { "type": "string", "description": "Browser tests. Playwright uses the system Chromium at /usr/bin/chromium with --no-sandbox." },
+        "migrate":   { "type": "string" },
+        "seed":      { "type": "string" },
+        "deploy":    { "type": "string" },
+        "clean":     { "type": "string" }
+    },
+    "additionalProperties": true
+}

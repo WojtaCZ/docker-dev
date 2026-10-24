@@ -1,0 +1,110 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build",
+            "type": "shell",
+            "command": "mcu build",
+            "group": { "kind": "build", "isDefault": true },
+            "presentation": { "reveal": "always", "panel": "shared" },
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "Build (Debug)",
+            "type": "shell",
+            "command": "mcu buildDebug",
+            "group": "build",
+            "presentation": { "reveal": "always", "panel": "shared" },
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "Clean",
+            "type": "shell",
+            "command": "mcu clean",
+            "presentation": { "reveal": "always", "panel": "shared" },
+            "problemMatcher": []
+        },
+        {
+            "label": "Size (with budget check)",
+            "type": "shell",
+            "command": "mcu size",
+            "presentation": { "reveal": "always", "panel": "shared" },
+            "problemMatcher": []
+        },
+        {
+            "label": "Flash",
+            "type": "shell",
+            "command": "mcu flash",
+            "dependsOn": "Build",
+            "presentation": { "reveal": "always", "panel": "shared" },
+            "problemMatcher": []
+        },
+        {
+            "label": "Erase chip",
+            "type": "shell",
+            "command": "mcu erase",
+            "presentation": { "reveal": "always", "panel": "shared" },
+            "problemMatcher": []
+        },
+        {
+            "label": "Reset target",
+            "type": "shell",
+            "command": "mcu reset",
+            "presentation": { "reveal": "always", "panel": "shared" },
+            "problemMatcher": []
+        },
+        {
+            "label": "Serial monitor",
+            "type": "shell",
+            "command": "mcu serial",
+            "presentation": { "reveal": "always", "panel": "dedicated", "focus": true },
+            "problemMatcher": []
+        },
+        {
+            "label": "RTT monitor",
+            "type": "shell",
+            "command": "mcu rtt",
+            "presentation": { "reveal": "always", "panel": "dedicated", "focus": true },
+            "problemMatcher": []
+        },
+        {
+            "label": "Test (hardware-in-the-loop)",
+            "type": "shell",
+            "command": "mcu test",
+            "group": { "kind": "test", "isDefault": true },
+            "presentation": { "reveal": "always", "panel": "shared" },
+            "problemMatcher": []
+        },
+        {
+            "label": "Test (host, no hardware)",
+            "type": "shell",
+            "command": "mcu hostTest",
+            "group": "test",
+            "presentation": { "reveal": "always", "panel": "shared" },
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "Export profile to .env",
+            "type": "shell",
+            "command": "mcu --export",
+            "presentation": { "reveal": "silent", "panel": "shared" },
+            "problemMatcher": []
+        },
+        {
+            "label": "Debug",
+            "type": "shell",
+            "command": "mcu debugServer",
+            "isBackground": true,
+            "dependsOn": "Export profile to .env",
+            "presentation": { "reveal": "always", "panel": "dedicated" },
+            "problemMatcher": {
+                "pattern": { "regexp": "^$" },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^(Open On-Chip Debugger|Info : Listening|.*probe-rs)",
+                    "endsPattern": "(Listening on port 3333|GDB stub listening|Waiting for GDB)"
+                }
+            }
+        }
+    ]
+}
