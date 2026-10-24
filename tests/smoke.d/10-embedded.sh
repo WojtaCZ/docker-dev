@@ -161,6 +161,7 @@ python - <<'PY'
 import json
 p = json.load(open(".mcu-profile.json"))
 p["ELF"] = "build_elf"
+p["core"] = "host"            # a host-built ELF: no cross prefix (the prefix is per-project now)
 p["sizeBudget"] = {"flash": 1, "ram": 1}      # deliberately impossible
 json.dump(p, open(".mcu-profile.json", "w"), indent=2)
 PY

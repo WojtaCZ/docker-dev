@@ -18,11 +18,15 @@ for t in gcc g++ gdb objcopy objdump nm size readelf; do
 done
 pass "gcc $(riscv-none-elf-gcc -dumpversion)"
 
-# launch.json's RISC-V configuration resolves the debugger through CROSS_GDB,
-# which mcu --export derives from CROSS_PREFIX. Both must line up.
-[ "${CROSS_PREFIX:-}" = "riscv-none-elf-" ] \
-    || fail "CROSS_PREFIX is '${CROSS_PREFIX:-}', expected riscv-none-elf-"
-pass "CROSS_PREFIX=$CROSS_PREFIX"
+# launch.json's RISC-V configuration resolves the debugger through CROSS_GDB, which
+# `mcu --export` derives from the PROJECT's cross prefix (profile crossPrefix), not
+# from a container-wide variable.
+_w=$(mktemp -d)
+cp /opt/embedded/profiles/wch.json "$_w/.mcu-profile.json"
+( cd "$_w" && mcu --export ./env.out >/dev/null && grep -q '^CROSS_GDB=.*riscv-none-elf-gdb$' ./env.out ) \
+    || fail "mcu --export did not derive CROSS_GDB=riscv-none-elf-gdb from the wch profile"
+rm -rf "$_w"
+pass "wch profile -> riscv-none-elf- -> CROSS_GDB"
 
 echo "== multilibs =="
 riscv-none-elf-gcc -print-multi-lib | grep -q 'rv32e' \
