@@ -42,6 +42,9 @@ check "mixed repo: wch component" "P=[riscv-none-elf-]" "$(prefix_in "$T/mix/fw-
 out="$(cd "$T/arm" && CROSS_PREFIX=zzz- bash "$MCU" build 2>&1)"
 check "inherited CROSS_PREFIX is overridden" "P=[arm-none-eabi-]" "$out"
 
+check "mcu --cross-prefix prints the project's prefix" "arm-none-eabi-" "$(cd "$T/root/fw/sub/dir" && bash "$MCU" --cross-prefix 2>&1)"
+check "mcu --cross-prefix in a riscv component" "riscv-none-elf-" "$(cd "$T/mix/fw-wch/src" && bash "$MCU" --cross-prefix 2>&1)"
+
 mkdir -p "$T/empty/deeper"
 out="$(cd "$T/empty/deeper" && bash "$MCU" build 2>&1)"; rc=$?
 check "no profile anywhere exits 1" "1" "$rc"

@@ -6,22 +6,73 @@
     "mcpServers": {
         "github": {
             "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-github"],
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-github"
+            ],
             "env": {
                 "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
             }
         },
         "git": {
             "command": "uvx",
-            "args": ["mcp-server-git"]
+            "args": [
+                "mcp-server-git"
+            ]
         },
         "context7": {
             "command": "npx",
-            "args": ["-y", "@upstash/context7-mcp"]
+            "args": [
+                "-y",
+                "@upstash/context7-mcp"
+            ]
         },
         "sequential-thinking": {
             "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-sequential-thinking"
+            ]
+        },
+        "fetch": {
+            "_comment": "uvx, NOT npx: @modelcontextprotocol/server-fetch does not exist on npm (404); the fetch server is published on PyPI as mcp-server-fetch.",
+            "command": "uvx",
+            "args": [
+                "mcp-server-fetch"
+            ]
+        },
+        "playwright": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@playwright/mcp",
+                "--browser",
+                "chromium",
+                "--executable-path",
+                "/usr/bin/chromium",
+                "--no-sandbox"
+            ]
+        },
+        "sqlite": {
+            "_comment": "Relative path: resolved against the session's working directory, i.e. the project. scripts/web-post-create.sh creates it.",
+            "command": "uvx",
+            "args": [
+                "mcp-server-sqlite",
+                "--db-path",
+                ".dev.db"
+            ]
         }
+    },
+    "hooks": {
+        "SessionStart": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "trail-ensure"
+                    }
+                ]
+            }
+        ]
     }
 }

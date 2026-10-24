@@ -12,6 +12,7 @@
 #   mcu --clangd         (re)write the .clangd fallback
 #   mcu --print <key>    print the command without running it
 #   mcu --schema         show the profile schema
+#   mcu --cross-prefix   print this project's cross-toolchain prefix (arm-none-eabi-, ...)
 #
 # The profile is the nearest .mcu-profile.json at or above the current directory
 # (PROFILE_FILE overrides it); mcu runs from that file's directory. CROSS_PREFIX
@@ -404,6 +405,11 @@ main() {
         --clangd)
             require_profile
             write_clangd_fallback force
+            return 0
+            ;;
+        --cross-prefix)
+            require_profile
+            echo "$CROSS_PREFIX"
             return 0
             ;;
         --print)

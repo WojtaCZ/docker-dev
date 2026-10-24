@@ -79,5 +79,11 @@ pass "memory layers present: $(ls "$HOME/.claude-memory-layers" | tr '\n' ' ')"
 grep -q "MAINTENANCE RULE" "$M" || fail "merged CLAUDE.md is missing this image's layer (MAINTENANCE RULE)"
 pass "CLAUDE.md assembled, this image's layer present"
 
+echo "== per-platform sections (ported from the child images) =="
+for section in "$(dirname "${BASH_SOURCE[0]}")"/smoke.d/*.sh; do
+    echo "---- $(basename "$section") ----"
+    bash "$section" || fail "section $(basename "$section") failed"
+done
+
 echo
 echo "SMOKE TEST PASSED"
