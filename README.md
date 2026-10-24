@@ -153,6 +153,7 @@ the baseline memory stays under 120 lines.
 ## CI
 
 `publish.yml` builds, lints, runs the parity check, unit tests and smoke test, then pushes
-`ghcr.io/<owner>/docker-dev-template` (`latest`, branch, semver, sha). It also rebuilds
+`ghcr.io/<owner>/docker-dev` (`latest`, branch, semver, sha). The repo was renamed from
+`docker-dev-template`; the old `ghcr.io/<owner>/docker-dev-template` package is no longer updated. It also rebuilds
 weekly to pick up Arch updates. `promote-stable.yml` moves `:stable` only after the
 latest main build is green.

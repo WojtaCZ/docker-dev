@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke test for docker-dev-template. Runs INSIDE the built image.
+# Smoke test for docker-dev. Runs INSIDE the built image.
 #
 #   docker run --rm -e DEV_SKIP_UPDATE=1 -v "$PWD/tests:/tests:ro" <image> bash /tests/smoke.sh
 #

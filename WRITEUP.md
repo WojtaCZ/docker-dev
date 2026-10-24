@@ -1,4 +1,4 @@
-# docker-dev-template — Functional Writeup
+# docker-dev (formerly docker-dev-template) — Functional Writeup
 
 > **Superseded in part (2026-10-24): see "Unified image" at the end.** This repo is
 > no longer the root of a fleet: the embedded (base/arm/wch/telink) and web images were

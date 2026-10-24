@@ -9,7 +9,7 @@
 # install them on the host, including when you only have the image and not a
 # repo checkout:
 #
-#   docker run --rm ghcr.io/wojtacz/docker-dev-template:latest \
+#   docker run --rm ghcr.io/wojtacz/docker-dev:latest \
 #       tar -C /opt/embedded -c udev-rules | tar -x -C /tmp
 #   sudo /tmp/udev-rules/../install-host-udev-rules.sh
 #

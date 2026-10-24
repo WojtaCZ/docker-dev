@@ -68,7 +68,7 @@ file or `DEV_TRAIL=0` turns it off. Read `.trail/learnings/` before exploring un
 
 ## MAINTENANCE RULE: read this before adding a skill, command or tool
 
-This image is built from the `docker-dev-template` repo. When you add something,
+This image is built from the `docker-dev` repo. When you add something,
 do all of the following in the same change, or the in-container Claude will not see it:
 
 1. **Skills are directories**: `claude-baseline/skills/<name>/SKILL.md` with `name` and
