@@ -68,9 +68,8 @@ fi
 #
 # Each image in the inheritance chain drops ONE file into ~/.claude-layers/
 # containing only its own additions:
-#     00-baseline.json   (docker-dev-template)
-#     10-embedded.json   (docker-dev-embedded-base)
-#     20-arm.json        (docker-dev-embedded-arm)
+#     00-baseline.json   (shipped in the image)
+#     NN-*.json          (optional private layers a user adds)
 # They are merged in lexical order with jq's recursive merge, so a later layer
 # can add MCP servers without restating the ones it inherited, and can override
 # a single inherited key by name.
@@ -93,9 +92,8 @@ fi
 # Same inheritance idea as the settings layers above, but CLAUDE.md is prose,
 # not JSON, so the layers are CONCATENATED in lexical order rather than
 # deep-merged:
-#     00-baseline.md   (docker-dev-template)
-#     10-embedded.md   (docker-dev-embedded-base)
-#     20-arm.md        (docker-dev-embedded-arm)
+#     00-baseline.md   (shipped in the image)
+#     NN-*.md          (optional private layers a user adds)
 #
 # The result is ~/.claude/CLAUDE.md — user-level memory, loaded in every session
 # no matter which project is mounted at /workspace. Its job is to tell Claude
@@ -113,6 +111,24 @@ if [ -d "$MEM_DIR" ] && compgen -G "$MEM_DIR/*.md" >/dev/null 2>&1; then
         rm -f "$HOME/.claude/CLAUDE.md.new"
         echo "WARN: could not assemble Claude memory layers from $MEM_DIR" >&2
         echo "      leaving existing $HOME/.claude/CLAUDE.md in place" >&2
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Map /workspace onto the per-project mount.
+#
+# dev-up.sh mounts the project at /workspaces/<name>-<hash> (so Claude's per-project
+# memory, which is keyed by the working directory, never mixes two projects that
+# share a folder name) and passes DEV_WORKSPACE. /workspace stays valid as a symlink
+# for anything that hard-codes it. A project mounted directly AT /workspace (an old
+# launcher, a devcontainer) is a non-empty directory or a mount point: left alone.
+# ---------------------------------------------------------------------------
+if [ -n "${DEV_WORKSPACE:-}" ] && [ -d "$DEV_WORKSPACE" ] && [ "$DEV_WORKSPACE" != /workspace ]; then
+    if [ -L /workspace ] || { [ -d /workspace ] && [ -z "$(ls -A /workspace 2>/dev/null)" ] \
+                              && ! mountpoint -q /workspace 2>/dev/null; }; then
+        sudo -n rm -rf /workspace 2>/dev/null \
+            && sudo -n ln -sfn "$DEV_WORKSPACE" /workspace 2>/dev/null \
+            || echo "WARN: could not point /workspace at $DEV_WORKSPACE" >&2
     fi
 fi
 

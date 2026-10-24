@@ -51,4 +51,14 @@ out=$(trail telemetry status 2>&1 || true)
 grep -qi 'disabled\|off' <<< "$out" || fail "trail telemetry is not disabled: $out"
 pass "trail telemetry disabled"
 
+echo "== short baseline memory =="
+M="$HOME/.claude/CLAUDE.md"
+lines=$(wc -l < "$M")
+[ "$lines" -le 120 ] || fail "~/.claude/CLAUDE.md is $lines lines (limit 120): platform detail belongs in skills"
+for needle in '.mcu-profile.json' '.web-profile.json' 'dev-components.json' 'MAINTENANCE RULE' 'trail-ensure' '/workspaces/' 'mcu --cross-prefix'; do
+    grep -qF -- "$needle" "$M" || fail "baseline memory does not mention '$needle'"
+done
+! grep -q 'Fleet inheritance' "$M" || fail "baseline memory still describes the old image fleet"
+pass "memory is $lines lines and carries the routing table"
+
 echo "section 60-unified passed"
