@@ -39,7 +39,7 @@ Flash-tool selection for STM32:
 mkdir -p .vscode cmake src test/host
 cp /opt/embedded/vscode-templates/tasks.json  .vscode/tasks.json
 cp /opt/embedded/vscode-templates/launch.json .vscode/launch.json
-cp /opt/embedded/profile.json                 .mcu-profile.json
+cp /opt/embedded/profiles/<arm|wch|telink>.json .mcu-profile.json   # pick the arch you were given
 ```
 
 ### 4. Fill in the profile

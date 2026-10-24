@@ -40,7 +40,7 @@ illegal instructions.
 mkdir -p .vscode src
 cp /opt/embedded/vscode-templates/tasks.json  .vscode/tasks.json
 cp /opt/embedded/vscode-templates/launch.json .vscode/launch.json
-cp /opt/embedded/profile.json                 .mcu-profile.json   # CH582F: /opt/embedded/profiles/ch582f.json
+cp /opt/embedded/profiles/wch.json            .mcu-profile.json   # CH582F: /opt/embedded/profiles/ch582f.json
 ```
 
 Set `chip`, `core`, `march`, `mabi` and a real `sizeBudget` from the table

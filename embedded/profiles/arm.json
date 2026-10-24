@@ -32,6 +32,7 @@
 
     "chip": "STM32F407VG",
     "core": "cortex-m4",
+    "crossPrefix": "arm-none-eabi-",
     "fpu": "fpv4-sp-d16",
     "floatAbi": "hard",
     "probe": "stlink",

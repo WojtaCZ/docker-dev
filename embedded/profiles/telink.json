@@ -8,6 +8,7 @@
     },
     "chip": "TLSR8258F512ET32",
     "core": "tc32",
+    "crossPrefix": "tc32-elf-",
     "probe": "usb-serial",
     "flashTool": "tlsr",
     "SDK": "/opt/telink/sdk",

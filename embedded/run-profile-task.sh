@@ -13,6 +13,11 @@
 #   mcu --print <key>    print the command without running it
 #   mcu --schema         show the profile schema
 #
+# The profile is the nearest .mcu-profile.json at or above the current directory
+# (PROFILE_FILE overrides it); mcu runs from that file's directory. CROSS_PREFIX
+# is exported per project from the profile's crossPrefix, and derived from
+# core/march when a profile predates that key.
+#
 # Built-in keys, used when the profile does not define them:
 #   size      section sizes, enforced against .sizeBudget
 #   test      flash + capture target output + assert on .testPass/.testFail
@@ -25,7 +30,11 @@
 
 set -uo pipefail
 
-PROFILE_FILE="${PROFILE_FILE:-.mcu-profile.json}"
+# PROFILE_FILE, when set, is used exactly as given. Otherwise the nearest
+# .mcu-profile.json is searched for upward from $PWD and `mcu` runs from that
+# file's directory (like `make -C`), so it works from any subdirectory of a
+# component and in repos that hold several components.
+PROFILE_FILE="${PROFILE_FILE:-}"
 SCHEMA_FILE="${SCHEMA_FILE:-/opt/embedded/profile.schema.json}"
 
 # Keys whose values are commands rather than settings.
@@ -36,10 +45,53 @@ die() {
     exit 1
 }
 
+# Print the nearest .mcu-profile.json at or above $PWD, or nothing.
+find_profile_upward() {
+    local dir="$PWD"
+    while :; do
+        if [ -f "$dir/.mcu-profile.json" ]; then
+            echo "$dir/.mcu-profile.json"
+            return 0
+        fi
+        [ "$dir" = "/" ] && return 1
+        dir="$(dirname "$dir")"
+    done
+}
+
+# CROSS_PREFIX is a property of the project, never of the container: the profile's
+# crossPrefix wins; profiles scaffolded before that key existed fall back to the
+# architecture named by core / march.
+derive_cross_prefix() {
+    local explicit core march
+    explicit="$(jq -r '.crossPrefix // empty' "$PROFILE_FILE")"
+    if [ -n "$explicit" ]; then
+        echo "$explicit"
+        return 0
+    fi
+    core="$(jq -r '.core // empty' "$PROFILE_FILE")"
+    march="$(jq -r '.march // empty' "$PROFILE_FILE")"
+    case "$core" in
+        cortex-*) echo "arm-none-eabi-" ;;
+        rv32*)    echo "riscv-none-elf-" ;;
+        tc32)     echo "tc32-elf-" ;;
+        *)        if [ -n "$march" ]; then echo "riscv-none-elf-"; else echo ""; fi ;;
+    esac
+}
+
 require_profile() {
+    local found
+    if [ -z "$PROFILE_FILE" ]; then
+        found="$(find_profile_upward)" || die ".mcu-profile.json not found in $(pwd) or any parent directory.
+       Run /scaffold-mcu-project <arm|wch|telink> <part> from Claude to set up the workspace."
+        PROFILE_FILE="$found"
+        cd "$(dirname "$found")" || die "cannot enter $(dirname "$found")"
+        PROFILE_FILE=".mcu-profile.json"
+    fi
     [ -f "$PROFILE_FILE" ] || die "$PROFILE_FILE not found in $(pwd).
        Run /scaffold-mcu-project <arm|wch|telink> <part> from Claude to set up the workspace."
     jq -e . "$PROFILE_FILE" >/dev/null 2>&1 || die "$PROFILE_FILE is not valid JSON."
+    CROSS_PREFIX="$(derive_cross_prefix)"
+    export CROSS_PREFIX
 }
 
 get() {

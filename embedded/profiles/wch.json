@@ -16,6 +16,7 @@
 
     "chip": "CH32V003F4P6",
     "core": "rv32ec",
+    "crossPrefix": "riscv-none-elf-",
     "march": "rv32ec_zicsr",
     "mabi": "ilp32e",
     "probe": "wlink",

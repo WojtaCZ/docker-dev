@@ -42,7 +42,7 @@ probe-rs chip list | grep -i <part>      # authoritative memory map + support
 mkdir -p .vscode cmake linker svd inc src src/logic startup lib test/host
 cp /opt/embedded/vscode-templates/tasks.json  .vscode/tasks.json
 cp /opt/embedded/vscode-templates/launch.json .vscode/launch.json
-cp /opt/embedded/profile.json                 .mcu-profile.json
+cp /opt/embedded/profiles/arm.json            .mcu-profile.json
 printf 'build/\nbuild-host/\n.vscode/.profile.env\n' > .gitignore
 ```
 
