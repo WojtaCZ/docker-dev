@@ -46,3 +46,6 @@ id_ecdsa*
 *.keystore
 .claude/settings.local.json
 .claude/.credentials.json
+
+# Executing-plans scratch (ledger, briefs)
+.superpowers/
