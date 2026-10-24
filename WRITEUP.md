@@ -1,7 +1,10 @@
 # docker-dev-template — Functional Writeup
 
-> Position in the fleet: **root image**. Everything else descends from this.
-> Full-fleet architecture notes live in `docker-dev-embedded-base/WRITEUP.md`.
+> **Superseded in part (2026-10-24): see "Unified image" at the end.** This repo is
+> no longer the root of a fleet: the embedded (base/arm/wch/telink) and web images were
+> merged into it, so it is now the only image. Sections 1-6 describe the original
+> baseline image and stay as the record of why the machinery (layers, doctor, smoke
+> tests) looks the way it does.
 
 > **Note:** the analysis below describes the repo *as it was audited* on
 > 2026-09-02. Every defect listed has since been fixed and every proposal
@@ -213,3 +216,36 @@ are fixed. The sections above are kept as the record of *why*.
 
 `BASE_TAG` defaults to `latest` because `:stable` does not exist until the first
 promotion runs. Flip the default in each leaf once you have promoted one.
+
+
+## Unified image (2026-10-24)
+
+Design: `docs/superpowers/specs/2026-10-24-unified-dev-container-design.md`.
+Plan: `docs/superpowers/plans/2026-10-24-unified-dev-container.md`.
+
+One image now holds the baseline, ARM Cortex-M, WCH RISC-V, the Telink runtime pieces
+and the web stack, all baked at build time, plus Trail-Code. What changed and why:
+
+| Change | Why |
+| --- | --- |
+| Single `Dockerfile`, slow layers first | Switching containers per sub-project (firmware + PC app + its web UI) was the problem. Editing a script no longer rebuilds a toolchain. |
+| No container-wide `CROSS_PREFIX`; `crossPrefix` in `.mcu-profile.json` | Each child set a different value, so one image cannot have one. `mcu` exports it per project and derives it from `core`/`march` for older profiles; `mcu --cross-prefix` prints it. |
+| `mcu` resolves the profile upward and runs from its directory | Mixed repos hold several components; run it from anywhere inside one. |
+| `/opt/embedded/profiles/{arm,wch,telink,ch582f}.json` | Replaces the three different `profile.json` defaults (the Telink one was a WCH copy and wrong). |
+| Skills in directory form with cue-rich descriptions | Only `<name>/SKILL.md` triggers on its own; skills sit at user level, so in a repo with web and firmware both sets are live and the task decides. |
+| Short `CLAUDE.md` (limit 120 lines, enforced) | It is loaded every session; platform detail moved into skills. |
+| `dev-up.sh` from the newest (arm) launcher + ttyUSB + Bluetooth + Telink SDK + `DEV_PORTS` | ttyUSB was never granted to the container but the Telink flow uses `/dev/ttyUSB0`. |
+| Project mounted at `/workspaces/<name>-<hash>`, `/workspace` symlink | Claude memory is keyed by working directory; two folders with the same name no longer share one. |
+| Container-private persisted state in `~/.claude-dev` (`DEV_STATE_DIR`) | History, file-history, backups and sessions died with `--rm`. Kept apart from the host's `~/.claude` because `sessions/` is keyed by pid and would collide with the host's live sessions. |
+| Trail-Code pinned, `trail-ensure` on SessionStart | Per-project setup without a TTY (`init --agents claude --yes`); never commits; telemetry off via `trail telemetry disable`. |
+| `tests/merge-parity.sh` + generated manifest | "Did everything get merged" is answered by a test, not a review. |
+
+### Known issues carried over from the child repos
+
+| ID | Severity | Issue |
+| --- | --- | --- |
+| A9 | High | `/scaffold-mcu-project` (the generic ARM path) still emits a hand-written `ARCH_FLAGS` block and never mentions `CMAKE_TOOLCHAIN_FILE`/`ARM_CORE`, so a scaffolded project configures with the host compiler until it adopts the toolchain file. `/stm32-new-project` lays out the canonical tree correctly. |
+| B9 | Low | The `Debug` task's `problemMatcher.endsPattern` matches openocd's `Listening on port 3333`; ordering is not guaranteed. Works in practice. |
+| U1 | Info | Trail's documented monorepo scopes are `package.json` workspaces, `go.mod`, `pyproject.toml`, `Cargo.toml`. A CMake firmware directory may not be ranked as its own scope in a mixed repo; unverified. |
+| U2 | Info | Existing container state from before the merge (`~/Documents/docker-dev/arm-container-state-*`) is not migrated into `~/.claude-dev` automatically. Copy it in if you want the old prompt history. |
+| U3 | Info | The devcontainer mounts at `/workspaces/<basename>` (no hash: devcontainer variables cannot compute one), so two same-named folders share a memory namespace there. `dev-up.sh` does not have this limit. |

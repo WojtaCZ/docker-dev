@@ -9,7 +9,7 @@
 # come last, so editing a script does not rebuild a toolchain.
 #
 # Toolchain selection is per PROJECT (`crossPrefix` in .mcu-profile.json, read by
-# `mcu`), so there is deliberately no global ENV CROSS_PREFIX here.
+# `mcu`), so there is deliberately no container-wide CROSS_PREFIX variable.
 FROM archlinux:latest
 
 ARG USER_NAME=dev

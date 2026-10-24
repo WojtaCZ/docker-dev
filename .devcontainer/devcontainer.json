@@ -1,21 +1,41 @@
 {
-    "name": "dev-template-baseline",
+    "name": "docker-dev (unified)",
     "build": {
         "context": "..",
-        "dockerfile": "../Dockerfile",
-        "args": {
-            "BASE_TAG": "${localEnv:DEV_CHANNEL:latest}"
-        }
+        "dockerfile": "../Dockerfile"
     },
     "remoteUser": "dev",
-    "workspaceFolder": "/workspace",
-    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind,consistency=cached",
+    "initializeCommand": "mkdir -p \"$HOME/.claude/projects\" \"$HOME/.trail\" \"$HOME/.claude-dev/file-history\" \"$HOME/.claude-dev/backups\" \"$HOME/.claude-dev/sessions\" \"$HOME/.claude-dev/session-env\" \"$HOME/.claude-dev/shell-snapshots\" && touch \"$HOME/.claude.json\" \"$HOME/.claude/.credentials.json\" \"$HOME/.claude-dev/history.jsonl\"",
     "mounts": [
-        "source=${localEnv:HOME}/.claude.json,target=/host-claude-auth.json,type=bind",
-        "source=${localEnv:HOME}/.claude,target=/host-claude-dir,type=bind"
+        "source=${localEnv:HOME}/.claude.json,target=/home/dev/.claude.json,type=bind",
+        "source=${localEnv:HOME}/.claude/.credentials.json,target=/home/dev/.claude/.credentials.json,type=bind",
+        "source=${localEnv:HOME}/.claude/projects,target=/home/dev/.claude/projects,type=bind",
+        "source=${localEnv:HOME}/.claude-dev/history.jsonl,target=/home/dev/.claude/history.jsonl,type=bind",
+        "source=${localEnv:HOME}/.claude-dev/file-history,target=/home/dev/.claude/file-history,type=bind",
+        "source=${localEnv:HOME}/.claude-dev/backups,target=/home/dev/.claude/backups,type=bind",
+        "source=${localEnv:HOME}/.claude-dev/sessions,target=/home/dev/.claude/sessions,type=bind",
+        "source=${localEnv:HOME}/.claude-dev/session-env,target=/home/dev/.claude/session-env,type=bind",
+        "source=${localEnv:HOME}/.claude-dev/shell-snapshots,target=/home/dev/.claude/shell-snapshots,type=bind",
+        "source=${localEnv:HOME}/.trail,target=/home/dev/.trail,type=bind",
+        "source=/dev/bus/usb,target=/dev/bus/usb,type=bind",
+        "source=dev-cache-npm,target=/home/dev/.npm,type=volume",
+        "source=dev-cache-uv,target=/home/dev/.cache/uv,type=volume",
+        "source=dev-cache-cargo,target=/home/dev/.cargo,type=volume",
+        "source=dev-cache-pyocd,target=/opt/pyocd,type=volume",
+        "source=dev-cache-ccache,target=/home/dev/.cache/ccache,type=volume",
+        "source=dev-cache-bun,target=/home/dev/.bun/install/cache,type=volume",
+        "source=dev-cache-deno,target=/home/dev/.cache/deno,type=volume",
+        "source=dev-cache-composer,target=/home/dev/.cache/composer,type=volume"
     ],
     "runArgs": [
-        "--init"
+        "--init",
+        "--device-cgroup-rule=c 189:* rmw",
+        "--device-cgroup-rule=c 166:* rmw",
+        "--device-cgroup-rule=c 188:* rmw",
+        "--group-add=dialout",
+        "--group-add=plugdev"
     ],
     "postCreateCommand": "bash /usr/local/bin/post-create.sh && dev-doctor || true",
     "customizations": {
@@ -24,12 +44,50 @@
                 "anthropic.claude-code",
                 "eamodio.gitlens",
                 "ms-azuretools.vscode-docker",
-                "github.vscode-pull-request-github"
+                "github.vscode-pull-request-github",
+                "marus25.cortex-debug",
+                "mcu-debug.peripheral-viewer",
+                "mcu-debug.memory-view",
+                "mcu-debug.rtos-views",
+                "webfreak.debug",
+                "llvm-vs-code-extensions.vscode-clangd",
+                "ms-vscode.cmake-tools",
+                "ms-vscode.makefile-tools",
+                "twxs.cmake",
+                "xaver.clang-format",
+                "notskm.clang-tidy",
+                "dan-c-underwood.arm",
+                "zixuanwang.linkerscript",
+                "jeff-hykin.better-cpp-syntax",
+                "esbenp.prettier-vscode",
+                "dbaeumer.vscode-eslint",
+                "bradlc.vscode-tailwindcss",
+                "bmewburn.vscode-intelephense-client",
+                "ms-vscode.vscode-typescript-next",
+                "usernamehw.errorlens",
+                "cweijan.vscode-mysql-client2",
+                "antfu.vite",
+                "ms-playwright.playwright"
             ],
             "settings": {
-                "terminal.integrated.defaultProfile.linux": "bash"
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "clangd.arguments": [
+                    "--compile-commands-dir=${workspaceFolder}/build"
+                ],
+                "cortex-debug.armToolchainPath": "/usr/bin",
+                "[javascript]": { "editor.defaultFormatter": "esbenp.prettier-vscode", "editor.formatOnSave": true },
+                "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode", "editor.formatOnSave": true },
+                "[json]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+                "[css]": { "editor.defaultFormatter": "esbenp.prettier-vscode", "editor.formatOnSave": true },
+                "[php]": {
+                    "editor.defaultFormatter": "bmewburn.vscode-intelephense-client",
+                    "editor.formatOnSave": true
+                }
             }
         }
+    },
+    "containerEnv": {
+        "DEV_WORKSPACE": "/workspaces/${localWorkspaceFolderBasename}"
     },
     "remoteEnv": {
         "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}"

@@ -1,19 +1,12 @@
 name: Promote to :stable
 
-# The `:latest` tag moves on every green build of THIS repo. `:stable` moves
-# only once the downstream matrix has also built green against it — that is the
-# tag leaf images should track when you want a quiet week.
+# The `:latest` tag moves on every green build of THIS repo. `:stable` moves only
+# when the most recent completed build of the publish workflow on main succeeded.
+# The unified image has no downstream images any more, so there is no matrix to check.
 #
 # Triggered by:
-#   * schedule — weekly, an hour after the leaves rebuild, and only promotes if
-#     every downstream repo's latest main build actually succeeded.
-#   * workflow_dispatch — manual promotion of a specific tag, no downstream check.
-#
-# There is deliberately no cross-repo dispatch here any more. That needed a PAT,
-# the PAT expired silently, and nothing promoted for months without anyone
-# noticing. Reading each downstream repo's run status needs no credential now
-# that they are public, and it verifies the thing actually cared about rather
-# than trusting a ping to have arrived.
+#   * schedule: weekly, an hour after the weekly rebuild.
+#   * workflow_dispatch: manual promotion of a specific tag, no build check.
 
 on:
   workflow_dispatch:
@@ -33,26 +26,23 @@ jobs:
   promote:
     runs-on: ubuntu-latest
     steps:
-      # A scheduled promotion is only meaningful if the images built FROM this
-      # one are green. A repo that cannot be read counts as not-green: skipping a
-      # promotion is cheap, moving :stable onto an unverified digest is not.
-      - name: Check the downstream matrix
+      # A scheduled promotion is only meaningful if the latest main build is green.
+      # An unreadable result counts as not-green: skipping a promotion is cheap,
+      # moving :stable onto an unverified digest is not.
+      - name: Check the latest main build
         id: matrix
         if: github.event_name == 'schedule'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          green=true
-          for repo in docker-dev-embedded-base docker-dev-embedded-arm; do
-            conclusion=$(gh api \
-              "repos/${{ github.repository_owner }}/$repo/actions/workflows/publish.yml/runs?branch=main&status=completed&per_page=1" \
-              --jq '.workflow_runs[0].conclusion // "unknown"' 2>/dev/null || echo unreadable)
-            echo "$repo: $conclusion"
-            [ "$conclusion" = "success" ] || green=false
-          done
+          conclusion=$(gh api \
+            "repos/${{ github.repository }}/actions/workflows/publish.yml/runs?branch=main&status=completed&per_page=1" \
+            --jq '.workflow_runs[0].conclusion // "unknown"' 2>/dev/null || echo unreadable)
+          echo "publish.yml on main: $conclusion"
+          if [ "$conclusion" = "success" ]; then green=true; else green=false; fi
           echo "green=$green" >> "$GITHUB_OUTPUT"
           if [ "$green" != "true" ]; then
-            echo "::notice::downstream matrix is not green; leaving :stable where it is"
+            echo "::notice::latest main build is not green; leaving :stable where it is"
           fi
 
       - uses: docker/login-action@v4

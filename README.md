@@ -1,283 +1,145 @@
-# docker-dev-template
+# docker-dev
 
-A baseline dev container for Claude Code-driven development.
+One dev container for everything: ARM Cortex-M, WCH RISC-V and Telink firmware, a PC
+app, and its web interface. Every toolchain, debug tool and hardware-interface tool is
+baked in at build time (nothing is installed in a running container), and Claude Code
+inside it picks the right tool from the project you are in.
 
-- **Base OS:** Arch Linux (`archlinux:latest`) — rolling release, very recent toolchains
-- **User:** non-root `dev` with passwordless `sudo` inside the container
-- **Claude Code:** pre-installed, self-updates on container start, safe to run with `--dangerously-skip-permissions`
-- **Workspace:** bind-mounted at `/workspace`
-- **Auth sharing:** host `~/.claude.json` is shared across every container built from this template
-- **Skill isolation:** each container ships its own `~/.claude/skills|agents|commands|settings.json` baked into the image
+The former `docker-dev-embedded-{base,arm,wch,telink}` and `docker-dev-web` images were
+merged into this one. Design: `docs/superpowers/specs/2026-10-24-unified-dev-container-design.md`.
 
-## Quick start (VSCode)
-
-1. Install **Docker Desktop** and the **Dev Containers** VSCode extension.
-2. Clone this repo (or a project that uses it as a base image) and open it in VSCode.
-3. Command palette → **Dev Containers: Reopen in Container**.
-
-On first run the container will:
-
-- Full-upgrade Arch and install the baseline toolchain
-- Install Claude Code under `/home/dev/.local/bin`
-- Symlink your host `~/.claude.json` into the container so auth is shared
-- Run `claude update` on every subsequent start
-
-## Layout
-
-```
-.
-├── Dockerfile                   # Arch base, dev user, Claude Code
-├── .devcontainer/
-│   └── devcontainer.json        # VSCode mounts + extensions
-├── .github/workflows/
-│   ├── publish.yml              # build → smoke test → push → fan out
-│   └── promote-stable.yml       # retag a verified digest as :stable
-├── scripts/
-│   ├── entrypoint.sh            # every start: UID remap, shared state, settings merge
-│   ├── post-create.sh           # once after create (git config)
-│   └── dev-doctor.sh            # → /usr/local/bin/dev-doctor
-└── claude-baseline/
-    ├── settings.json            # → ~/.claude-layers/00-baseline.json  (merged at start)
-    ├── skills/                  # → ~/.claude/skills/     (per-container)
-    ├── agents/                  # → ~/.claude/agents/     (per-container)
-    └── commands/                # → ~/.claude/commands/   (per-container)
-```
-
-## Layered Claude settings
-
-`settings.json` is **not** copied straight to `~/.claude/settings.json`. Each
-image in the inheritance chain drops one file into `~/.claude-layers/`
-containing only its own additions:
-
-```
-~/.claude-layers/00-baseline.json   docker-dev-template
-~/.claude-layers/10-embedded.json   docker-dev-embedded-base
-~/.claude-layers/20-arm.json        docker-dev-embedded-arm
-```
-
-`entrypoint.sh` merges them in lexical order with jq's recursive merge
-(`reduce .[] as $l ({}; . * $l)`) into `~/.claude/settings.json` at container
-start. A leaf therefore declares only the MCP servers it adds, instead of
-restating everything it inherits — add a baseline MCP once, and every
-descendant picks it up on its next start.
-
-To override a single inherited server, redeclare it by the same key in a
-higher-numbered layer.
-
-## dev-doctor
-
-Every image ships `/usr/local/bin/dev-doctor`, which self-checks the container:
-baseline binaries, Claude auth, merged settings validity, that every declared
-MCP server's launcher resolves, `/workspace` writability, and host/container UID
-alignment.
+## Quick start
 
 ```bash
-dev-doctor            # human-readable table
-dev-doctor --json     # machine-readable; exits non-zero on any FAIL
+./scripts/dev-up.sh                  # builds the image, mounts $(pwd), opens a shell
+./scripts/dev-up.sh ~/code/project   # a specific project
+DEV_DOCTOR=1 ./scripts/dev-up.sh     # run dev-doctor and exit
 ```
 
-Descendant images extend it by dropping an executable into
-`/opt/dev-doctor/checks.d/`. Each check prints `STATUS|name|detail` lines with
-`STATUS` in `OK` / `WARN` / `FAIL`; only `FAIL` affects the exit status. CI runs
-`dev-doctor --json | jq -e '.ok == true'` before anything is pushed.
+Windows: `.\scripts\dev-up.ps1` is a WSL2 shim (probe passthrough needs Linux device
+nodes); attach probes with `usbipd attach --wsl` first. VS Code: "Reopen in Container".
 
-## Sharing auth without sharing skills
+The project appears at `/workspaces/<name>-<hash>` (your cwd); `/workspace` is a symlink
+to it. The hash keeps two folders with the same name apart, which matters because Claude's
+per-project memory is keyed by that path.
 
-`.claude.json` holds **auth + settings + history**; it does *not* contain skill content. Skills, agents and commands live as files under `~/.claude/skills/`, `~/.claude/agents/`, `~/.claude/commands/`.
+## What is inside
 
-The devcontainer mounts the host's `~/.claude.json` and `~/.claude` directory under `/host-claude-auth.json` and `/host-claude-dir/`. The entrypoint then **symlinks only the sharable bits** (`projects/`, `memory/`, `.credentials.json`) into the container's `~/.claude/`, leaving the baked-in `skills/`, `agents/`, `commands/` and `settings.json` untouched.
+| Area | Tools |
+|---|---|
+| Base | Arch Linux, `dev` user (passwordless sudo), git, gh, jq, node, python/uv, cmake, ninja, clang, multiarch gdb |
+| ARM Cortex-M | `arm-none-eabi-*`, CMSIS_6, CMSIS-DSP (m0+, m3, m4f, m7f, m33f), ST device headers (16 families), STM32 SVDs |
+| WCH RISC-V | xPack `riscv-none-elf-*`, `wlink`, `wchisp`, ch32fun |
+| Telink TLSR8258 | runtime pieces; the compiler is a **host mount** (EULA) |
+| Debug / bench | openocd, probe-rs, pyocd, st-flash, dfu-util, sigrok-cli, picocom, bluetoothctl, ALSA tools |
+| Web | php, composer, deno, bun, nginx, chromium for Playwright, sqlite, DB clients |
+| Trail-Code | `trail`, set up per project automatically (below) |
 
-Result: a specialised container (embedded, web, data) shares conversation history and auth with the host, but carries its **own** skill/agent/MCP set.
+`dev-doctor` reports on all of it.
 
-## Baseline MCP servers
+## How a toolchain is chosen
 
-Declared in `claude-baseline/settings.json`:
+By project, never by container. Each component directory carries a profile:
 
-| Server                | Purpose                                  |
-| --------------------- | ---------------------------------------- |
-| `github`              | Repos, issues, PRs, Actions (needs `GITHUB_TOKEN`) |
-| `git`                 | Local repo inspection                    |
-| `context7`            | Up-to-date library/framework docs        |
-| `sequential-thinking` | Structured multi-step reasoning          |
+| Marker | Runner | Cross prefix |
+|---|---|---|
+| `.mcu-profile.json`, `core: cortex-*` | `mcu build/flash/debugServer/size/test` | `arm-none-eabi-` |
+| `.mcu-profile.json`, `core: rv32*` | `mcu ...` | `riscv-none-elf-` |
+| `.mcu-profile.json`, `core: tc32` | `mcu ...` (needs the Telink SDK mounted) | `tc32-elf-` |
+| `.web-profile.json` / `package.json` / `composer.json` | `web dev/build/test` (`web --init` detects the stack) | n/a |
 
-Set `GITHUB_TOKEN` in your host environment (or in VSCode's `remoteEnv`) for the GitHub MCP to work.
+`mcu` finds the nearest `.mcu-profile.json` upward, runs from that directory and exports
+`CROSS_PREFIX` from the profile's `crossPrefix` (derived from `core`/`march` for older
+profiles); `mcu --cross-prefix` prints it. There is no container-wide `CROSS_PREFIX`.
 
-## Baseline skills (suggested, to be dropped into `claude-baseline/skills/`)
+Scaffold with `/scaffold-mcu-project <arm|wch|telink> <part>`, `/stm32-new-project <part>`,
+`/ch32-new-project <part>`. Skills live at user level and trigger on what you are doing,
+not on the directory, so a repo with firmware and a web UI has both sets available.
 
-- `init` — bootstrap CLAUDE.md in a new project
-- `review` — PR review pass
-- `security-review` — pre-merge security review
-- `simplify` — code quality pass
-- `less-permission-prompts` — reduce permission friction
+**Multi-component repos** (firmware + app + web): keep each component's profile in its
+own directory; Claude keeps an optional `.dev-components.json` at the root
+(`[{"path":"fw","kind":"fw-arm"},{"path":"ui","kind":"web"}]`) so it need not rediscover the layout.
 
-The placeholder `.gitkeep` files keep the dirs in git until you drop skill content in.
+## Devices
 
-## Building a specialised image
+`dev-up.sh` passes devices through **live**; nothing needs a restart:
 
-Specialised containers inherit everything baked into the baseline by using it as their `FROM` image. Any change you push here flows to every downstream image on its next `docker build --pull`.
+- `/dev/bus/usb`, `/dev/input`, `/dev/snd` are bind-mounted live, with wildcard
+  device-cgroup rules, so any probe works (libusb) regardless of vendor/product ID.
+- `ttyACM*`, `ttyUSB*`, `hidraw*` are flat in `/dev`: `scripts/dev-attach.sh attach /dev/ttyUSB0`
+  (or `detach`) mknods them into the running container; the udev rule from
+  `sudo scripts/install-host-udev-rules.sh` does it on every hotplug.
+- Bluetooth uses the host's bluetoothd through the system D-Bus socket.
+- Probe permissions are a HOST concern: run the udev installer once.
 
-### How propagation works
+## Vendor tooling (host mounts, auto-detected)
 
-1. **Push** a change to this repo (`main`).
-2. The **`publish.yml`** GitHub Action rebuilds the image and pushes to GHCR at `ghcr.io/wojtacz/docker-dev-template` with tags:
-   - `latest`       — rolling, tracks `main`
-   - `main-<sha>`   — immutable, per commit
-   - `vX.Y.Z`, `vX.Y` — on git tags, for pinned releases
-3. A specialised Dockerfile does `FROM ghcr.io/wojtacz/docker-dev-template:latest`.
-4. Its `dev-up.sh`/`.ps1` runs `docker build --pull`, which **refreshes the base layer** before rebuilding on top. Updated skills, scripts, MCP config, and toolchain all propagate.
+`DEV_TELINK_SDK` (`~/telink/Telink_825X_SDK` → `/opt/telink/sdk`), `DEV_CUBECLT`
+(`~/st/STM32CubeCLT`), `DEV_CUBEWBA` (`~/st/cubewba`, required for STM32WBA BLE),
+`DEV_ASSETS` (`/opt/assets`). Missing mounts are normal, not a fault.
 
-### Example specialised Dockerfile
+## Trail-Code
 
-```Dockerfile
-ARG BASE_TAG=latest
-FROM ghcr.io/wojtacz/docker-dev-template:${BASE_TAG}
+`trail-ensure` runs from a SessionStart hook and sets Trail up (or refreshes it) in the
+project: `trail init --agents claude --yes`, then `trail build` on later runs, with
+`--follow-submodules`/`--follow-nested-repos` where the layout needs them, and one map
+at the parent for a folder of separate repos. It **never commits**; it tells you which
+files appeared and which already-tracked files changed. `/trail-setup` does it on demand.
 
-# Extra toolchain.
-# NOTE Arch package names: use `gdb` (built --enable-targets=all, so it IS the
-# multiarch gdb — there is no `gdb-multiarch` package), and do not ask for
-# `clang-tools-extra`; clangd/clang-tidy/clang-format ship inside `clang`.
-USER root
-RUN pacman -Syu --noconfirm && \
-    pacman -S --noconfirm --needed \
-        arm-none-eabi-gcc arm-none-eabi-newlib \
-        openocd gdb stlink probe-rs cmake ninja picocom dfu-util \
-    && pacman -Scc --noconfirm
-USER dev
+Turn it off with an empty `.no-trail` file in a repo, or `DEV_TRAIL=0`. Telemetry is off
+(`trail telemetry disable` at build time).
 
-# Stack additional skills/agents on top of the baseline.
-# Use distinct filenames to avoid overwriting baseline skills; reuse a baseline
-# skill's filename only if you intentionally want to override it.
-COPY --chown=dev:dev skills/ /home/dev/.claude/skills/
-COPY --chown=dev:dev agents/ /home/dev/.claude/agents/
+One thing to know: `trail init` reads your past Claude sessions for the repo (using Claude
+under your login, so it counts toward your usage) and the review comments on the last 50
+merged PRs through `gh`. None of it goes to Trail.
 
-# MCP servers: ship ONLY your additions as a numbered layer. The entrypoint
-# merges every ~/.claude-layers/*.json in lexical order, so there is no need to
-# restate the baseline servers.
-COPY --chown=dev:dev settings.layer.json /home/dev/.claude-layers/10-myimage.json
+## Persistence
 
-# Optional: contribute a dev-doctor check for whatever you just installed.
-COPY --chown=root:root checks/50-mytoolchain.sh /opt/dev-doctor/checks.d/
-RUN chmod +x /opt/dev-doctor/checks.d/50-mytoolchain.sh
-```
+Across `--rm` runs: login, `projects/` and memory (shared with the host's `~/.claude`),
+and the container-private state in `DEV_STATE_DIR` (default `~/.claude-dev`: prompt
+history, file-history, backups, sessions) plus `~/.trail`. Skills, commands and plugins
+are baked into the image. Package caches are named volumes (`dev-cache-*`).
 
-### Release channels: `latest` vs `stable`
+## Switches
 
-| Tag | Moves when | Use for |
-| --- | --- | --- |
-| `latest` | every green build of `main` (after this repo's own smoke test) | personal dev, you want fixes immediately |
-| `stable` | only after the downstream leaves also build green against it | when you want a quiet week |
-| `vX.Y.Z` | never — immutable | shared/production templates |
+| Variable | Effect |
+|---|---|
+| `DEV_IMAGE`, `DEV_CONTAINER` | local tag (`dev-template`) and container name (`dev`) |
+| `DEV_NO_BUILD`, `DEV_NO_PULL`, `DEV_REBUILD` | skip the build / skip `--pull` / `--no-cache` |
+| `DEV_NO_CACHE_VOLUMES`, `DEV_SKIP_UPDATE` | no cache volumes / skip `claude update` at start |
+| `DEV_DOCTOR` | run `dev-doctor` and exit |
+| `DEV_TRAIL=0` | no automatic Trail setup |
+| `DEV_PORTS="3000 8080"` | publish dev-server ports on 127.0.0.1 |
+| `DEV_NO_SERVICES` | do not join the `docker-dev-web` service network |
+| `DEV_PROBE=/dev/ttyXX` | one extra static device |
+| `DEV_STATE_DIR` | where the container-private Claude state lives |
+| `DEV_TELINK_SDK`, `DEV_CUBECLT`, `DEV_CUBEWBA`, `DEV_ASSETS` | vendor mounts |
+| `DEV_PRINT=1` | print the `docker run` argv and exit |
 
-`stable` is moved by `.github/workflows/promote-stable.yml`, which retags an
-existing digest via `docker buildx imagetools create` (no rebuild, no layer
-re-upload). It fires on a `downstream-verified` repository dispatch from a leaf
-repo, or manually via `workflow_dispatch`.
+Backing services for web work (MariaDB, Postgres, Redis, Mailpit):
+`docker compose -f compose/docker-compose.yml up -d`; `dev-up.sh` then joins their network.
 
-Leaf Dockerfiles take a `BASE_TAG` build arg so you can switch channel without
-editing the `FROM` line:
+## Tests
 
 ```bash
-docker build --build-arg BASE_TAG=stable -t my-leaf .
-DEV_CHANNEL=stable ./scripts/dev-up.sh     # same thing, via the helper
+bash tests/run-unit.sh                  # unit tests, in a throwaway container (the host needs no jq)
+bash tests/unit/static.sh               # devcontainer/CI/doc checks
+bash tests/merge-parity.sh repo         # nothing from the old images is missing (repo side)
+docker run --rm -e DEV_SKIP_UPDATE=1 -v "$PWD/tests:/tests:ro" dev-template bash /tests/smoke.sh
 ```
 
-> `BASE_TAG` defaults to `latest` because `:stable` does not exist until the
-> first promotion runs. Flip the default in each leaf once you have promoted.
+`tests/parity/manifest.txt` is generated from the real old repos by
+`tools/gen-parity-manifest.sh <dir-with-the-old-repos>`; `merge-parity.sh image` checks the built image.
 
-### Triggering downstream rebuilds automatically
+## Adding things
 
-Two common setups, in increasing order of plumbing:
+Read the MAINTENANCE RULE at the end of `claude-baseline/CLAUDE.layer.md`: skills are
+directories, tools get a doctor check, everything is asserted in `tests/smoke.d/`, and
+the baseline memory stays under 120 lines.
 
-1. **On-demand** (simplest) — developer runs `dev-up.sh` / `.ps1`; the built-in `--pull` picks up new base layers.
-2. **Renovate PRs** — add a `renovate.json` to each specialised repo pinning `ghcr.io/wojtacz/docker-dev-template` — Renovate opens a PR whenever a new tag publishes.
-3. **Fan-out dispatch** — the base repo's workflow fires a `repository_dispatch` event at each specialised repo after a successful publish, triggering their own rebuild workflow.
+## CI
 
-## Git / SSH
-
-The devcontainer relies on VSCode's built-in SSH agent forwarding. Ensure your host SSH agent is running and has your key loaded:
-
-**Windows (PowerShell, admin):**
-```powershell
-Get-Service ssh-agent | Set-Service -StartupType Automatic -PassThru | Start-Service
-ssh-add $env:USERPROFILE\.ssh\id_ed25519
-```
-
-**Linux/macOS:**
-```bash
-eval "$(ssh-agent -s)"
-ssh-add ~/.ssh/id_ed25519
-```
-
-Inside the container, verify with `ssh -T git@github.com`.
-
-## Running Claude Code
-
-Inside the container:
-
-```bash
-claude --dangerously-skip-permissions
-```
-
-Running as `dev` (UID 1000), not root — safe to use the skip-permissions flag since the container is already an isolation boundary.
-
-## Headless CLI (no VSCode)
-
-Helper scripts build the image and drop you into a shell with all mounts and SSH agent forwarding set up:
-
-**Windows (PowerShell):**
-```powershell
-.\scripts\dev-up.ps1                              # workspace = current dir
-.\scripts\dev-up.ps1 -Workspace C:\code\my-proj   # mount a specific project
-.\scripts\dev-up.ps1 -Rebuild                     # force clean rebuild
-.\scripts\dev-up.ps1 -NoBuild                     # skip build, just run
-```
-
-**Linux / macOS:**
-```bash
-./scripts/dev-up.sh                        # workspace = $(pwd)
-./scripts/dev-up.sh ~/code/my-proj         # mount a specific project
-DEV_REBUILD=1 ./scripts/dev-up.sh          # force clean rebuild
-DEV_NO_BUILD=1 ./scripts/dev-up.sh         # skip build, just run
-DEV_SKIP_UPDATE=1 ./scripts/dev-up.sh      # skip `claude update` (fast/offline start)
-DEV_DOCTOR=1 ./scripts/dev-up.sh           # run dev-doctor and exit
-DEV_NO_CACHE_VOLUMES=1 ./scripts/dev-up.sh # don't mount the package caches
-```
-
-Both scripts mount `~/.claude.json` + `~/.claude/` (shared auth & history) and forward the host SSH agent via Docker Desktop's magic socket (`/run/host-services/ssh-auth.sock`). On Windows this requires the **OpenSSH Authentication Agent** service to be running; on macOS Docker Desktop wires it up automatically; on Linux it uses `$SSH_AUTH_SOCK` from the host shell.
-
-### Persistent caches
-
-`--rm` containers otherwise re-download every dependency on each launch. The
-helpers mount four named volumes:
-
-| Volume | Mounted at |
-| --- | --- |
-| `dev-cache-npm` | `/home/dev/.npm` |
-| `dev-cache-uv` | `/home/dev/.cache/uv` |
-| `dev-cache-cargo` | `/home/dev/.cargo` |
-| `dev-cache-pkg` | `/home/dev/.cache/pkg` |
-
-Wipe them with `docker volume rm dev-cache-npm dev-cache-uv dev-cache-cargo dev-cache-pkg`.
-
-### Host UID alignment
-
-The `dev` user is UID 1000 in the image. On Linux, if your host UID differs,
-everything written into `/workspace` lands with the wrong owner. `dev-up.sh`
-detects this and starts the container as root with `HOST_UID`/`HOST_GID` set;
-`entrypoint.sh` then remaps `dev` and drops privileges with `setpriv` before
-running anything. Docker Desktop (Windows/macOS) presents bind mounts as UID
-1000 already, so no remap happens there.
-
-`dev-doctor` warns when the container UID and `/workspace` owner disagree.
-
-**Aliasing for convenience:**
-
-Windows — add to your PowerShell profile (`$PROFILE`):
-```powershell
-function dev-up { & C:\Users\you\Documents\docker-dev-template\scripts\dev-up.ps1 @args }
-```
-
-Linux/macOS — add to `~/.bashrc` or `~/.zshrc`:
-```bash
-alias dev-up='~/Documents/docker-dev-template/scripts/dev-up.sh'
-```
+`publish.yml` builds, lints, runs the parity check, unit tests and smoke test, then pushes
+`ghcr.io/<owner>/docker-dev-template` (`latest`, branch, semver, sha). It also rebuilds
+weekly to pick up Arch updates. `promote-stable.yml` moves `:stable` only after the
+latest main build is green.

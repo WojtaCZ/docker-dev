@@ -7,10 +7,8 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
-  # Weekly rebuild. This is what keeps the chain fresh: there is no
-  # cross-repo dispatch any more, and a rebuild also picks up Arch package
-  # updates, which a change-triggered build would never do on its own.
-  # Staggered so a parent finishes before its children start (template 03:00, base 04:00, leaves 05:00 UTC Mondays).
+  # Weekly rebuild: picks up Arch package updates, which a change-triggered build
+  # would never do on its own. promote-stable.yml runs after it (06:00 UTC Mondays).
   schedule:
     - cron: '0 3 * * 1'
 
@@ -23,6 +21,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+
+      # The unified image is several GB and `load: true` stores it twice (BuildKit
+      # cache + Docker daemon), which does not fit beside the SDKs a hosted runner
+      # ships with: the build dies with "no space left on device" while importing.
+      # None of these are used here.
+      - name: Free up runner disk space
+        run: |
+          echo "before:"; df -h / | tail -1
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+                      /usr/local/.ghcup /usr/share/swift /usr/local/share/boost
+          echo "after:"; df -h / | tail -1
 
       - uses: docker/setup-buildx-action@v4
 
@@ -56,12 +65,24 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Lint shell scripts
+      - name: Lint shell, JSON and compose assets
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
-          shellcheck -S warning scripts/*.sh tests/*.sh
-          jq -e . claude-baseline/settings.json > /dev/null
-          echo "shell + JSON assets OK"
+          shellcheck -S warning scripts/*.sh embedded/*.sh embedded/scripts/*.sh web/*.sh \
+                                dev-doctor-checks/*.sh tools/*.sh tests/*.sh tests/unit/*.sh tests/smoke.d/*.sh
+          for f in claude-baseline/settings.json embedded/profile.schema.json \
+                   web/web-profile.schema.json embedded/profiles/*.json \
+                   embedded/vscode-templates/*.json web/vscode-templates/*.json; do
+            jq -e . "$f" > /dev/null || { echo "invalid JSON: $f"; exit 1; }
+          done
+          docker compose -f compose/docker-compose.yml config > /dev/null
+          echo "shell + JSON + compose assets OK"
+
+      - name: Merge parity (repo)
+        run: bash tests/merge-parity.sh repo
+
+      - name: Unit tests (inside the built image)
+        run: DEV_TEST_IMAGE=dev-template:ci bash tests/run-unit.sh
 
       - name: Smoke test
         run: |

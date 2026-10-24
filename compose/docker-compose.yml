@@ -5,9 +5,9 @@
 # and the db-schema-review skill — can inspect a live schema instead of reading
 # migration files.
 #
-#   docker compose up -d                 # start the services
-#   ./scripts/dev-up.sh                  # auto-joins the network when it exists
-#   docker compose down -v               # stop and wipe the data volumes
+#   docker compose -f compose/docker-compose.yml up -d     # start the services
+#   ./scripts/dev-up.sh                                    # auto-joins the network when it exists
+#   docker compose -f compose/docker-compose.yml down -v   # stop and wipe the data volumes
 #
 # Hostnames inside the dev container: mariadb, postgres, redis, mailpit.
 
