@@ -63,6 +63,12 @@ RUN sed -i '/^#\[multilib\]/,/^#Include/{s/^#//}' /etc/pacman.conf && \
         util-linux \
     && pacman -Scc --noconfirm
 
+# Pinned host keys for GitHub/GitLab/Bitbucket. Without them a fresh container has no
+# known_hosts and `git push` over SSH dies with "Host key verification failed" even
+# though the forwarded agent holds the keys. dev-up.sh adds the host's own known_hosts
+# read-only at /etc/ssh/ssh_known_hosts2 (also in OpenSSH's default global list).
+COPY scripts/ssh_known_hosts /etc/ssh/ssh_known_hosts
+
 # Non-root user with passwordless sudo (the container is already the isolation boundary)
 RUN groupadd --gid ${USER_GID} ${USER_NAME} && \
     useradd --uid ${USER_UID} --gid ${USER_GID} --create-home --shell /bin/bash ${USER_NAME} && \

@@ -141,6 +141,12 @@ done
 ensure_dir "$HOME/.trail"
 MOUNTS+=(-v "$HOME/.trail:/home/dev/.trail")
 
+# The host's SSH known_hosts, read-only, so private git servers the host already
+# trusts work too. The image's pinned /etc/ssh/ssh_known_hosts covers the big forges.
+if [ -f "$HOME/.ssh/known_hosts" ]; then
+    MOUNTS+=(-v "$HOME/.ssh/known_hosts:/etc/ssh/ssh_known_hosts2:ro")
+fi
+
 # Persistent package caches. Without these every `--rm` run re-downloads npm, uv,
 # cargo, composer, bun and deno content from scratch.
 if [ "${DEV_NO_CACHE_VOLUMES:-0}" != "1" ]; then

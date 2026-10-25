@@ -16,6 +16,12 @@ for b in git node npm python uv jq gh curl wget ssh sudo setpriv claude; do
     pass "$b"
 done
 
+echo "== ssh host keys =="
+for h in github.com gitlab.com bitbucket.org; do
+    ssh-keygen -F "$h" -f /etc/ssh/ssh_known_hosts >/dev/null || fail "no pinned host key for $h"
+    pass "pinned host key: $h"
+done
+
 echo "== user identity =="
 [ "$(id -un)" = "dev" ] || fail "expected to run as 'dev', got '$(id -un)'"
 pass "running as dev ($(id -u):$(id -g))"
