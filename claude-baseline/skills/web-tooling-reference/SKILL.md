@@ -1,6 +1,6 @@
 ---
 name: web-tooling-reference
-description: "What the unified image ships for web work and how to drive it: the `web` task runner and .web-profile.json keys (web dev/build/test/lint, web --init), php/composer, node, deno, bun, nginx, chromium for Playwright (no-sandbox risk, executable path), the sqlite MCP database and the docker-compose backing services. Use when working on a web interface, a PHP or JS project, Playwright or database tooling."
+description: "What the unified image ships for web work and how to drive it: the `web` task runner and .web-profile.json keys (web dev/build/test/lint, web --init), php/composer, node, deno, bun, nginx, chromium for Playwright (no-sandbox risk, executable path), the chrome-devtools MCP, lighthouse, the design plugins (frontend-design, impeccable, modern-web-guidance), the sqlite MCP database and the docker-compose backing services. Use when working on a web interface, a PHP or JS project, Playwright or database tooling."
 ---
 
 # Web tooling reference
@@ -43,3 +43,15 @@ MCP servers from this layer: `playwright`, `fetch`, `sqlite`.
 - The `sqlite` MCP server opens `.dev.db` in the project directory (relative path, resolved
   against the session's working directory); `post-create.sh` / `web-post-create.sh` create it.
 - VSCode starters: `/opt/web/vscode-templates/`.
+
+## Design and audit
+
+- Plugins (baked in, enabled): `frontend-design` (aesthetic direction for new UI),
+  `impeccable` (`/impeccable polish|audit|critique|typeset|...`), `modern-web-guidance`
+  (current platform best practices), `chrome-devtools-mcp` (DevTools MCP server:
+  performance traces, network, console, a11y tree; skills for a11y, LCP, memory leaks).
+- `chrome-devtools-mcp` launches headless `/usr/bin/chromium` with `--no-sandbox`
+  via `~/.config/cd4a/config.json` (root-owned, read-only). Use it for traces and
+  DevTools-level debugging; use `playwright` for scripted flows and screenshots.
+- `lighthouse <url> --chrome-flags="--headless --no-sandbox" --output=json` — feed the
+  JSON to `web-perf-audit`. `CHROME_PATH` already points at chromium.

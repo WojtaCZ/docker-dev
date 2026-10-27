@@ -282,6 +282,14 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
     PLAYWRIGHT_BROWSERS_PATH=/usr/lib/chromium \
     CHROMIUM_PATH=/usr/bin/chromium
 
+# Lighthouse CLI (performance, accessibility, SEO, best-practice audits). It
+# finds the browser through CHROME_PATH; in here it still needs
+#     lighthouse <url> --chrome-flags="--headless --no-sandbox"
+ARG LIGHTHOUSE_VERSION=13.5.0
+ENV CHROME_PATH=/usr/bin/chromium
+RUN npm install -g "lighthouse@${LIGHTHOUSE_VERSION}" && \
+    lighthouse --version
+
 # ===========================================================================
 # 7. Documentation: firmware API docs and user manuals
 #
@@ -407,6 +415,30 @@ RUN trail telemetry disable
 RUN claude plugin marketplace add anthropics/claude-plugins-official && \
     claude plugin install superpowers@claude-plugins-official --scope user && \
     claude plugin list | grep -q 'superpowers@claude-plugins-official'
+
+# Web design plugins, same scheme (enabled in claude-baseline/settings.json):
+#   * frontend-design: distinctive, non-templated UI direction (Anthropic)
+#   * modern-web-guidance: current web platform best practices (Google Chrome)
+#   * chrome-devtools-mcp: DevTools MCP server + a11y/LCP/memory debugging skills
+#   * impeccable: design fluency, /impeccable polish|audit|critique|... (pbakaus)
+RUN claude plugin marketplace add pbakaus/impeccable && \
+    for p in frontend-design@claude-plugins-official \
+             modern-web-guidance@claude-plugins-official \
+             chrome-devtools-mcp@claude-plugins-official \
+             impeccable@impeccable; do \
+        claude plugin install "$p" --scope user && \
+        claude plugin list | grep -q "$p" || exit 1; \
+    done
+
+# The chrome-devtools-mcp plugin's server takes no flags from us, so it is pointed
+# at the distro chromium through its global config file (discovered at
+# ~/.config/cd4a/config.json). Root-owned: its docs warn that an agent able to
+# edit it can change executablePath/chromeArg. ~/.config is made first so COPY
+# does not create it root-owned too.
+RUN mkdir -p /home/${USER_NAME}/.config
+COPY --chown=root:root claude-baseline/cd4a-config.json \
+     /home/${USER_NAME}/.config/cd4a/config.json
+ENV CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS=1
 
 # Baked-in Claude config: skills/, agents/, commands/ stay image-owned; auth,
 # projects and memory are shared via bind mounts at runtime.

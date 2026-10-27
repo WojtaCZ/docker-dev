@@ -1,0 +1,7 @@
+{
+    "executablePath": "/usr/bin/chromium",
+    "headless": true,
+    "isolated": true,
+    "chromeArg": ["--no-sandbox"],
+    "usageStatistics": false
+}

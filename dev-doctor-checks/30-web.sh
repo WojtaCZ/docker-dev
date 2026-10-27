@@ -10,7 +10,7 @@ need() {
     else emit FAIL "$1" "not found on PATH"; fi
 }
 
-for b in php composer deno bun node npm nginx sqlite3 redis-cli chromium web; do
+for b in php composer deno bun node npm nginx sqlite3 redis-cli chromium lighthouse web; do
     need "$b"
 done
 

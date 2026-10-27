@@ -7,7 +7,7 @@ pass() { echo "  ok  $*"; }
 
 echo "== toolchain =="
 for b in php composer deno bun node npm nginx sqlite3 redis-cli chromium \
-         web dev-doctor; do
+         lighthouse web dev-doctor; do
     command -v "$b" >/dev/null || fail "missing: $b"
     pass "$b"
 done
@@ -58,6 +58,26 @@ while IFS=$'\t' read -r name cmd; do
     command -v "$cmd" >/dev/null || fail "MCP '$name' needs '$cmd', not on PATH"
 done < <(jq -r '.mcpServers | to_entries[] | "\(.key)\t\(.value.command)"' "$S")
 pass "every MCP launcher resolves"
+
+echo "== web design plugins =="
+plugins=$(claude plugin list 2>/dev/null)
+for p in frontend-design@claude-plugins-official modern-web-guidance@claude-plugins-official \
+         chrome-devtools-mcp@claude-plugins-official impeccable@impeccable; do
+    grep -q "$p" <<<"$plugins" || fail "plugin $p not installed"
+    jq -e --arg p "$p" '.enabledPlugins[$p] == true' "$S" >/dev/null \
+        || fail "plugin $p not enabled in merged settings"
+    pass "plugin: $p"
+done
+
+# The chrome-devtools-mcp plugin launches Chrome stable by default, which is not
+# in the image; its global config file must redirect it to the system chromium.
+C="$HOME/.config/cd4a/config.json"
+jq -e '.executablePath == "/usr/bin/chromium" and .headless == true
+       and (.chromeArg | index("--no-sandbox"))' "$C" >/dev/null \
+    || fail "$C does not point chrome-devtools-mcp at headless system chromium"
+[ -w "$C" ] && fail "$C is writable by $(id -un); the agent could repoint the browser"
+[ -w "$HOME/.config" ] || fail "$HOME/.config is not writable; the cd4a COPY made it root-owned"
+pass "chrome-devtools-mcp wired to the system chromium"
 
 echo "== claude skills =="
 for s in php-modernize db-schema-review rest-api-review web-perf-audit design-tokens-setup; do

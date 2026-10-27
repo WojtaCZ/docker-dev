@@ -32,7 +32,7 @@ per-project memory is keyed by that path.
 | WCH RISC-V | xPack `riscv-none-elf-*`, `wlink`, `wchisp`, ch32fun |
 | Telink TLSR8258 | runtime pieces; the compiler is a **host mount** (EULA) |
 | Debug / bench | openocd, probe-rs, pyocd, st-flash, dfu-util, sigrok-cli, picocom, bluetoothctl, ALSA tools |
-| Web | php, composer, deno, bun, nginx, chromium for Playwright, sqlite, DB clients |
+| Web | php, composer, deno, bun, nginx, chromium for Playwright, lighthouse, sqlite, DB clients; Claude plugins frontend-design, impeccable, modern-web-guidance, chrome-devtools-mcp |
 | Docs | `docs-init` / `docs-build`: doxygen + graphviz (firmware API docs), one Markdown manual built as a mkdocs-material website and a typst PDF (via pandoc); no TeX Live. `/write-manual` in Claude |
 | Trail-Code | `trail`, set up per project automatically (below) |
 
