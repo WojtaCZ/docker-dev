@@ -138,11 +138,12 @@ RUN arm-none-eabi-gcc -print-multi-lib | grep -q 'v8-m.main' || \
         (echo "FATAL: newlib has no v8-m.main multilib; Cortex-M33 targets would fail to link" && exit 1)
 
 # Bench tooling: sigrok-cli (+fx2lafw so cheap FX2 analyzers enumerate), ALSA
-# utils for USB-MIDI, and bluez-utils (bluetoothctl/btmon) which talks to the
-# HOST's bluetoothd over the system D-Bus socket that dev-up.sh bind-mounts.
+# utils and RtMidi (C++ library + python-rtmidi bindings) for USB-MIDI, and
+# bluez-utils (bluetoothctl/btmon) which talks to the HOST's bluetoothd over the
+# system D-Bus socket that dev-up.sh bind-mounts.
 RUN pacman -S --noconfirm --needed \
         sigrok-cli sigrok-firmware-fx2lafw \
-        alsa-utils \
+        alsa-utils rtmidi python-rtmidi \
         bluez-utils \
     && pacman -Scc --noconfirm
 
@@ -282,7 +283,43 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
     CHROMIUM_PATH=/usr/bin/chromium
 
 # ===========================================================================
-# 7. Trail-Code (code map + learnings for coding agents), pinned
+# 7. Documentation: firmware API docs and user manuals
+#
+#   * doxygen + graphviz: API reference, call/caller and include graphs (dot).
+#   * typst: the printable manual (PDF). LaTeX-quality output from a ~45 MB
+#     binary that embeds its own fonts, instead of a 1-1.5 GB TeX Live.
+#   * mkdocs + mkdocs-material: the web edition of the manual (Mermaid renders
+#     client-side via pymdownx.superfences, which material already depends on).
+#   * pandoc: bridges the two (`pandoc -t typst`), and exports .docx on request.
+#     The upstream static binary, because Arch's pandoc-cli drags in several
+#     hundred MB of Haskell libraries.
+# ttf-dejavu gives graphviz real glyphs; without a font, dot renders boxes.
+# poppler (pdftoppm) lets Claude render PDF pages to PNG and look at the layout.
+# ===========================================================================
+ARG PANDOC_VERSION=3.12.1
+ARG MKDOCS_VERSION=1.6.1
+ARG MKDOCS_MATERIAL_VERSION=9.7.7
+RUN pacman -Syu --noconfirm && \
+    pacman -S --noconfirm --needed doxygen graphviz typst ttf-dejavu poppler && \
+    pacman -Scc --noconfirm
+RUN curl -fsSL -o /tmp/pandoc.tar.gz \
+      "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-linux-amd64.tar.gz" && \
+    tar -xzf /tmp/pandoc.tar.gz -C /tmp && \
+    install -m0755 "/tmp/pandoc-${PANDOC_VERSION}/bin/pandoc" /usr/local/bin/pandoc && \
+    rm -rf /tmp/pandoc* && \
+    pandoc --version | head -1 && \
+    pandoc --list-output-formats | grep -qx typst
+# mkdocs stays on 1.x: MkDocs 2.0 drops the plugin and theme system material is
+# built on. Material prints a banner about that on every build; the pin is the
+# answer to it, so silence it.
+ENV NO_MKDOCS_2_WARNING=1
+RUN uv tool install "mkdocs==${MKDOCS_VERSION}" \
+        --with "mkdocs-material==${MKDOCS_MATERIAL_VERSION}" && \
+    mkdocs --version && \
+    doxygen --version && dot -V && typst --version
+
+# ===========================================================================
+# 8. Trail-Code (code map + learnings for coding agents), pinned
 # The flag checks make a release that dropped what trail-ensure relies on fail
 # the BUILD rather than the first session.
 # ===========================================================================
@@ -294,7 +331,7 @@ RUN npm install -g "@trailhq/trail-code@${TRAIL_VERSION}" && \
     trail build --help 2>&1 | grep -q -- '--follow-nested-repos'
 
 # ===========================================================================
-# 8. Scripts, assets, doctor checks, udev rules, Claude config
+# 9. Scripts, assets, doctor checks, udev rules, Claude config
 # ===========================================================================
 COPY scripts/entrypoint.sh  /usr/local/bin/entrypoint.sh
 COPY scripts/post-create.sh /usr/local/bin/post-create.sh
@@ -332,6 +369,13 @@ COPY web/web-profile.schema.json /opt/web/web-profile.schema.json
 COPY web/vscode-templates/       /opt/web/vscode-templates/
 RUN chmod +x /opt/web/run-web-task.sh && \
     ln -sf /opt/web/run-web-task.sh /usr/local/bin/web
+
+# Docs kit: `docs-init` scaffolds docs/ (Doxyfile, MkDocs chapters, Typst layout),
+# `docs-build` turns the same Markdown into the website and the PDF.
+COPY doctools/ /opt/doctools/
+RUN chmod +x /opt/doctools/docs-init.sh /opt/doctools/docs-build.sh && \
+    ln -sf /opt/doctools/docs-init.sh  /usr/local/bin/docs-init && \
+    ln -sf /opt/doctools/docs-build.sh /usr/local/bin/docs-build
 
 # dev-doctor checks contributed by every platform (drop-in directory)
 RUN mkdir -p /opt/dev-doctor/checks.d

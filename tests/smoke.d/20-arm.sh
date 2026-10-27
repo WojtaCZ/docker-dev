@@ -26,6 +26,13 @@ done
 find /usr/share/sigrok-firmware -name 'fx2lafw-*.fw' | grep -q . \
     || fail "sigrok fx2lafw firmware missing"
 pass "sigrok fx2lafw firmware"
+pkg-config --exists rtmidi || fail "rtmidi C++ library not found by pkg-config"
+pass "rtmidi $(pkg-config --modversion rtmidi)"
+# Only check the ALSA backend is compiled in: opening a port needs /dev/snd/seq,
+# which a CI container without the sound device does not have.
+python -c 'import rtmidi, sys; sys.exit(rtmidi.API_LINUX_ALSA not in rtmidi.get_compiled_api())' \
+    || fail "python-rtmidi missing or built without ALSA"
+pass "python-rtmidi"
 
 
 echo "== newlib multilibs =="

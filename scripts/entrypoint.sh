@@ -132,6 +132,20 @@ if [ -n "${DEV_WORKSPACE:-}" ] && [ -d "$DEV_WORKSPACE" ] && [ "$DEV_WORKSPACE" 
     fi
 fi
 
+# Prune persisted scratchpads. dev-up.sh bind-mounts /tmp/claude-<uid> from the host
+# so a resumed session gets its scratchpad back; a session dir (<project>/<session>)
+# with nothing modified in DEV_SCRATCH_DAYS days is removed. Never blocks start.
+SCRATCH_ROOT="/tmp/claude-$(id -u)"
+SCRATCH_DAYS="${DEV_SCRATCH_DAYS:-14}"
+if [ -d "$SCRATCH_ROOT" ] && [[ "$SCRATCH_DAYS" =~ ^[0-9]+$ ]] && [ "$SCRATCH_DAYS" -gt 0 ]; then
+    for session in "$SCRATCH_ROOT"/*/*/; do
+        [ -d "$session" ] || continue
+        if [ -z "$(find "$session" -mmin -$((SCRATCH_DAYS * 1440)) -print -quit 2>/dev/null)" ]; then
+            rm -rf "$session" 2>/dev/null || true
+        fi
+    done
+fi
+
 # Best-effort self-update; never block container start.
 # Set DEV_SKIP_UPDATE=1 for fast cold starts or offline use.
 if [ "${DEV_SKIP_UPDATE:-0}" != "1" ]; then

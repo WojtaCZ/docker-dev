@@ -41,6 +41,7 @@ param(
     [switch]$NoServices,
     [string]$Probe,
     [string]$Ports,
+    [string]$PortRange,
     [string]$Assets,
     [string]$StateDir,
     [string]$TelinkSdk,
@@ -62,6 +63,7 @@ if ($Image)     { $env:DEV_IMAGE      = $Image }
 if ($Container) { $env:DEV_CONTAINER  = $Container }
 if ($Probe)     { $env:DEV_PROBE      = $Probe }
 if ($Ports)     { $env:DEV_PORTS      = $Ports }
+if ($PortRange) { $env:DEV_PORT_RANGE = $PortRange }
 if ($Assets)    { $env:DEV_ASSETS     = $Assets }
 if ($StateDir)  { $env:DEV_STATE_DIR  = $StateDir }
 if ($TelinkSdk) { $env:DEV_TELINK_SDK = $TelinkSdk }
@@ -71,7 +73,7 @@ if ($CubeWba)   { $env:DEV_CUBEWBA    = $CubeWba }
 # WSLENV makes these visible to the Linux side of the call.
 $env:WSLENV = "DEV_NO_BUILD:DEV_NO_PULL:DEV_REBUILD:DEV_NO_CACHE_VOLUMES:" +
               "DEV_SKIP_UPDATE:DEV_DOCTOR:DEV_NO_SERVICES:DEV_TRAIL:" +
-              "DEV_IMAGE:DEV_CONTAINER:DEV_PROBE:DEV_PORTS:DEV_ASSETS:DEV_STATE_DIR:" +
+              "DEV_IMAGE:DEV_CONTAINER:DEV_PROBE:DEV_PORTS:DEV_PORT_RANGE:DEV_ASSETS:DEV_STATE_DIR:" +
               "DEV_TELINK_SDK:DEV_CUBECLT:DEV_CUBEWBA"
 
 $wslWorkspace = wsl --exec wslpath -a $Workspace

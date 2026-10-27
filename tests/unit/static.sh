@@ -53,7 +53,7 @@ lacks Dockerfile 'ENV CROSS_PREFIX'
 if grep -nE '^(ENV|ARG)[[:space:]].*CROSS_PREFIX' Dockerfile >/dev/null; then bad "Dockerfile sets CROSS_PREFIX"; else ok "Dockerfile sets no CROSS_PREFIX"; fi
 
 for needle in 'Migrating from the old images' 'install-host-udev-rules.sh' 'dev.attach' '.no-trail' 'DEV_TRAIL' 'past Claude sessions' 'dev-attach' 'DEV_STATE_DIR' \
-              'mcu --cross-prefix' '/workspaces/' '.dev-components.json' 'DEV_TELINK_SDK' 'DEV_PORTS'; do
+              'mcu --cross-prefix' '/workspaces/' '.dev-components.json' 'DEV_TELINK_SDK' 'DEV_PORTS' 'DEV_PORT_RANGE'; do
     has README.md "$needle"
 done
 lacks README.md 'docker-dev-embedded-base:'

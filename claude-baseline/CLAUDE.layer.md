@@ -16,6 +16,7 @@ filesystem.
 | Telink TLSR8258 | runtime pieces only; the compiler is a **host mount** at `/opt/telink/sdk` (skill `telink-sdk-mount`) |
 | Debug / probes | `openocd`, `probe-rs`, `pyocd`, `st-flash`, `dfu-util`, `sigrok-cli`, `picocom`/`minicom`/`socat`, `bluetoothctl` |
 | Web | `php`, `composer`, `deno`, `bun`, `nginx`, `chromium` (Playwright), `sqlite`, DB clients |
+| Docs | `docs-init` / `docs-build` over `doxygen` + `dot`, `mkdocs` (material), `pandoc`, `typst`; `pdftoppm`; no LaTeX |
 | Trail-Code | `trail` (code map + learnings) |
 
 MCP servers: `github`, `git`, `context7`, `sequential-thinking`, `fetch`, `playwright`, `sqlite`.
@@ -30,6 +31,7 @@ MCP servers: `github`, `git`, `context7`, `sequential-thinking`, `fetch`, `playw
 | `.mcu-profile.json` (`core: tc32`) | Telink firmware | `mcu ...`; prefix `tc32-elf-`; SDK must be mounted |
 | `.web-profile.json`, `package.json`, `composer.json` | web | `web dev/build/test` (`web --init` detects the stack) |
 | `CMakeLists.txt`/`Makefile` and none of the above | host C/C++ | `cmake`, `ninja`, `g++`/`clang++` |
+| `docs/manual/mkdocs.yml`, or asked for API docs / a user manual | docs | `docs-build`; `/write-manual`; skills `user-manual-writing`, `firmware-docs` |
 
 - **There is no container-wide `CROSS_PREFIX`.** It belongs to the project: `mcu`
   exports it from the profile (`crossPrefix`), and `mcu --cross-prefix` prints it.
@@ -76,9 +78,15 @@ project so the next session continues instead of rediscovering: `<project>/.clau
 - The project is mounted at `/workspaces/<name>-<hash>` (your cwd); `/workspace` is a
   symlink to it. Your per-project memory is keyed by that path.
 - Persisted across container re-runs: login, `projects/` + memory, prompt history,
-  file-history, sessions, `~/.trail`. Skills, commands and plugins are baked in.
+  file-history, sessions, `~/.trail`, and your scratchpad (`/tmp/claude-<uid>`, found
+  again on `--resume`, pruned after 14 idle days). Anything the user keeps goes in the project. Skills, commands and plugins are baked in.
 - Vendor tooling is a read-only host mount: Telink SDK `/opt/telink/sdk`, STM32CubeCLT
   `/opt/st/clt`, STM32CubeWBA `/opt/st/cubewba`. Absent mounts are normal, not a fault.
+- **Ports reachable from the host browser: `$DEV_PORT_RANGE`** (e.g. `20140-20159`)
+  plus any in `$DEV_PORTS`, published 1:1 on the host's `127.0.0.1`. Run dev servers,
+  previews and debug UIs on a port from that range, bound to `0.0.0.0` (a server on
+  `127.0.0.1` inside the container is unreachable), and give the user
+  `http://localhost:<port>`. Other ports work only inside the container.
 - Devices attach while the container runs (`/dev/bus/usb`, input, ALSA live;
   `ttyACM`/`ttyUSB`/`hidraw` via `dev-attach`). udev rules are a HOST concern.
 

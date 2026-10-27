@@ -1,0 +1,36 @@
+# Firmware API reference. Paths are relative to the project root (the parent of
+# docs/), which is where docs-build runs doxygen. docs-build also sets
+# OUTPUT_DIRECTORY, PROJECT_NUMBER and WARN_LOGFILE; do not set them here.
+# `doxygen -x docs/Doxyfile` shows only what differs from doxygen's defaults.
+
+PROJECT_NAME           = "@PRODUCT@ firmware"
+INPUT                  = @INPUT@
+RECURSIVE              = YES
+FILE_PATTERNS          = *.c *.h *.cpp *.hpp *.cc *.hh
+EXCLUDE_PATTERNS       = */CMSIS/* */Drivers/* */ch32fun/* */build/* */docs/* \
+                         */third_party/* */vendor/* */.git/*
+OPTIMIZE_OUTPUT_FOR_C  = @C_ONLY@
+EXTRACT_ALL            = NO
+EXTRACT_STATIC         = YES
+WARN_NO_PARAMDOC       = YES
+
+# Vendor attribute and register macros. Without these, every function carrying
+# __attribute__((...)) is mis-parsed and silently missing from the output.
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = YES
+PREDEFINED             = "__attribute__(x)=" \
+                         "__IO=volatile" "__I=volatile const" "__O=volatile" \
+                         "__STATIC_INLINE=static inline" \
+                         "__STATIC_FORCEINLINE=static inline" \
+                         "__WEAK=" "__packed=" "__INTERRUPT="
+
+HAVE_DOT               = YES
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
+DOT_IMAGE_FORMAT       = svg
+INTERACTIVE_SVG        = YES
+
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+QUIET                  = YES

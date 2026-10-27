@@ -33,6 +33,7 @@ per-project memory is keyed by that path.
 | Telink TLSR8258 | runtime pieces; the compiler is a **host mount** (EULA) |
 | Debug / bench | openocd, probe-rs, pyocd, st-flash, dfu-util, sigrok-cli, picocom, bluetoothctl, ALSA tools |
 | Web | php, composer, deno, bun, nginx, chromium for Playwright, sqlite, DB clients |
+| Docs | `docs-init` / `docs-build`: doxygen + graphviz (firmware API docs), one Markdown manual built as a mkdocs-material website and a typst PDF (via pandoc); no TeX Live. `/write-manual` in Claude |
 | Trail-Code | `trail`, set up per project automatically (below) |
 
 `dev-doctor` reports on all of it.
@@ -119,7 +120,8 @@ never shows as a change). Opt out with an empty `.no-notes` file or `DEV_NOTES=0
 
 Across `--rm` runs: login, `projects/` and memory (shared with the host's `~/.claude`),
 and the container-private state in `DEV_STATE_DIR` (default `~/.claude-dev`: prompt
-history, file-history, backups, sessions) plus `~/.trail`. Skills, commands and plugins
+history, file-history, backups, sessions, and `tmp/` holding Claude's per-session
+scratchpads, pruned after `DEV_SCRATCH_DAYS` idle days, default 14) plus `~/.trail`. Skills, commands and plugins
 are baked into the image. Package caches are named volumes (`dev-cache-*`).
 
 ## Switches
@@ -131,7 +133,8 @@ are baked into the image. Package caches are named volumes (`dev-cache-*`).
 | `DEV_NO_CACHE_VOLUMES`, `DEV_SKIP_UPDATE` | no cache volumes / skip `claude update` at start |
 | `DEV_DOCTOR` | run `dev-doctor` and exit |
 | `DEV_TRAIL=0` | no automatic Trail setup |
-| `DEV_PORTS="3000 8080"` | publish dev-server ports on 127.0.0.1 |
+| `DEV_PORT_RANGE=20000-20019` | port range published 1:1 on 127.0.0.1 and exported into the container, so Claude runs dev servers there. Default: a per-project block of 20 in 20000-29999 from the workspace hash (printed at start); `none` disables |
+| `DEV_PORTS="3000 8080"` | publish extra dev-server ports on 127.0.0.1 |
 | `DEV_NO_SERVICES` | do not join the `docker-dev-web` service network |
 | `DEV_PROBE=/dev/ttyXX` | one extra static device |
 | `DEV_STATE_DIR` | where the container-private Claude state lives |

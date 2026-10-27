@@ -9,7 +9,7 @@
         "packageManager": { "type": "string", "description": "Command used to install and run scripts." },
         "nodeVersion":    { "type": "string" },
         "phpVersion":     { "type": "string" },
-        "devPort":        { "type": ["string", "integer"], "description": "Port the dev server binds. Publish it with dev-up.sh's DEV_PORTS." },
+        "devPort":        { "type": ["string", "integer"], "description": "Port the dev server binds. Pick one from $DEV_PORT_RANGE (published to the host), or publish it with dev-up.sh's DEV_PORTS." },
         "dbUrl":          { "type": "string", "description": "Connection string for the migrate/seed tasks." },
 
         "install":   { "type": "string", "description": "Install dependencies." },

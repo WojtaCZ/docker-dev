@@ -26,6 +26,11 @@
 #   DEV_TRAIL=0            do not auto-set-up Trail-Code in projects (also: a `.no-trail` file)
 #   DEV_PROBE=/dev/ttyXX   additional single device to pass through (static: must
 #                          exist at container start, unlike /dev/bus/usb below)
+#   DEV_PORT_RANGE=a-b     port range published on 127.0.0.1 (same numbers inside and
+#                          out) and exported into the container so Claude uses it.
+#                          Default: a per-project block of 20 in 20000-29999 derived
+#                          from the workspace hash, so side-by-side projects don't
+#                          clash. DEV_PORT_RANGE=none publishes no range.
 #   DEV_PORTS="3000 8080"  extra ports to publish on 127.0.0.1
 #   DEV_NO_SERVICES=1      don't join the docker-compose service network
 #   DEV_ASSETS=<path>      read-only mount at /opt/assets for licence-encumbered
@@ -33,7 +38,9 @@
 #   DEV_STATE_DIR=<path>   container-private Claude state (default ~/.claude-dev):
 #                          prompt history, file-history, backups, sessions, ...
 #                          kept apart from the host's ~/.claude so pids and
-#                          sessions of the two never collide
+#                          sessions of the two never collide. Also holds tmp/, the
+#                          persisted Claude scratchpads
+#   DEV_SCRATCH_DAYS=<n>   prune persisted scratchpads idle for n days (default 14)
 #   DEV_PRINT=1            print the final `docker run` argv, one per line, and exit
 #                          (no build, no docker call; used by the unit tests)
 #
@@ -136,6 +143,14 @@ for d in "${STATE_DIRS[@]}"; do
     ensure_dir "$STATE_DIR/$d"
     MOUNTS+=(-v "$STATE_DIR/$d:/home/dev/.claude/$d")
 done
+# Claude Code's per-session scratchpads live under /tmp/claude-<uid>/<project>/<session>/.
+# Persisting them means `claude --resume` finds its build trees and intermediate files
+# again; a new session still starts with an empty one. The container user has the host
+# UID (entrypoint.sh remaps it), and entrypoint.sh prunes sessions idle for
+# DEV_SCRATCH_DAYS (default 14).
+ensure_dir "$STATE_DIR/tmp"
+[ "$PRINT" = "1" ] || chmod 700 "$STATE_DIR/tmp"
+MOUNTS+=(-v "$STATE_DIR/tmp:/tmp/claude-$(id -u)")
 
 # Trail-Code personal learnings: shared with the host so they follow the user.
 ensure_dir "$HOME/.trail"
@@ -269,6 +284,7 @@ fi
 ENV_ARGS=(-e "DEV_WORKSPACE=$WS_MOUNT")
 [ "${DEV_SKIP_UPDATE:-0}" = "1" ] && ENV_ARGS+=(-e DEV_SKIP_UPDATE=1)
 [ "${DEV_TRAIL:-1}" = "0" ] && ENV_ARGS+=(-e DEV_TRAIL=0)
+[ -n "${DEV_SCRATCH_DAYS:-}" ] && ENV_ARGS+=(-e "DEV_SCRATCH_DAYS=$DEV_SCRATCH_DAYS")
 [ -n "${GITHUB_TOKEN:-}" ] && ENV_ARGS+=(-e "GITHUB_TOKEN=$GITHUB_TOKEN")
 
 # Git identity: reuse the host's, passed as env rather than copying ~/.gitconfig
@@ -293,10 +309,33 @@ else
 fi
 
 # Publish dev-server ports on loopback only (the web interface of whatever you build).
+# The range keeps the same numbers on both sides, so a URL printed inside the
+# container works unchanged in the host browser. The per-project default comes from
+# the hash already in WS_MOUNT: 500 blocks of 20 ports in 20000-29999.
+PORT_RANGE="${DEV_PORT_RANGE:-}"
+if [ -z "$PORT_RANGE" ]; then
+    block=$(( 16#${WS_MOUNT: -8} % 500 ))
+    PORT_RANGE="$(( 20000 + block * 20 ))-$(( 20019 + block * 20 ))"
+fi
 PORT_ARGS=()
+case "$PORT_RANGE" in
+    none|0) PORT_RANGE="" ;;
+    *)
+        if ! [[ "$PORT_RANGE" =~ ^([0-9]+)-([0-9]+)$ ]] || \
+           [ "${BASH_REMATCH[1]}" -lt 1 ] || [ "${BASH_REMATCH[2]}" -gt 65535 ] || \
+           [ "${BASH_REMATCH[1]}" -gt "${BASH_REMATCH[2]}" ]; then
+            echo "ERROR: DEV_PORT_RANGE='$PORT_RANGE' is not <first>-<last> within 1-65535" >&2
+            exit 1
+        fi
+        PORT_ARGS+=(-p "127.0.0.1:${PORT_RANGE}:${PORT_RANGE}")
+        ENV_ARGS+=(-e "DEV_PORT_RANGE=$PORT_RANGE")
+        echo "info: publishing ports $PORT_RANGE on 127.0.0.1" >&2
+        ;;
+esac
 for p in ${DEV_PORTS:-}; do
     PORT_ARGS+=(-p "127.0.0.1:${p}:${p}")
 done
+[ -n "${DEV_PORTS:-}" ] && ENV_ARGS+=(-e "DEV_PORTS=$DEV_PORTS")
 
 # Join the backing-services network if `docker compose -f compose/docker-compose.yml up -d`
 # has been run (mariadb, postgres, redis, mailpit).

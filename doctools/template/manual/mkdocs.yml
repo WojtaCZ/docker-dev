@@ -1,0 +1,42 @@
+# Web edition of the manual. `nav` is also the chapter order of the PDF.
+site_name: "@PRODUCT@"
+site_description: "@PRODUCT@ user manual"
+docs_dir: docs
+site_dir: ../build/site
+
+theme:
+  name: material
+  language: @LANG@
+  features:
+    - navigation.footer
+    - navigation.top
+    - toc.follow
+    - search.highlight
+    - content.code.copy
+
+# With --strict (docs-build always uses it) a link to a missing #anchor fails
+# the build. Give headings you link to an explicit id: `## Reset { #reset }`.
+validation:
+  links:
+    anchors: warn
+
+# Only extensions whose output docs-build can carry into the PDF. Content tabs,
+# Mermaid and raw HTML render on the web only; use SVG images for diagrams.
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - attr_list
+  - def_list
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Introduction: index.md
+  - Safety: safety.md
+  - Getting started: getting-started.md
+  - Operation: operation.md
+  - Configuration: configuration.md
+  - Troubleshooting: troubleshooting.md
+  - Specifications: specifications.md

@@ -54,6 +54,7 @@ expect "projects shared" "$H/.claude/projects:/home/dev/.claude/projects"
 for s in history.jsonl file-history backups sessions session-env shell-snapshots; do
     expect "persisted state: $s" "$H/.claude-dev/$s:/home/dev/.claude/$s"
 done
+expect "scratchpads persisted" "$H/.claude-dev/tmp:/tmp/claude-$(id -u)"
 expect ".trail persisted" "$H/.trail:/home/dev/.trail"
 expect "telink SDK mount" "$H/telink/Telink_825X_SDK:/opt/telink/sdk:ro"
 expect "CubeCLT mount" "$H/st/STM32CubeCLT:/opt/st/clt:ro"
@@ -96,6 +97,29 @@ expect "DEV_TRAIL passed through" "DEV_TRAIL=0"
 expect "DEV_PORTS published on loopback" "127.0.0.1:3000:3000"
 expect "second port" "127.0.0.1:8080:8080"
 expect "DEV_SKIP_UPDATE passed" "DEV_SKIP_UPDATE=1"
+expect "DEV_PORTS exported into the container" "DEV_PORTS=3000 8080"
+
+# --- port range -----------------------------------------------------------------
+runup "$UP" "$T/ws/app"
+range="$(sed -n 's/^DEV_PORT_RANGE=//p' <<< "$OUT")"
+check "default range is a 20-port block in 20000-29999" "ok" \
+    "$( [[ "$range" =~ ^([0-9]+)-([0-9]+)$ ]] && [ "${BASH_REMATCH[1]}" -ge 20000 ] && \
+        [ "${BASH_REMATCH[2]}" -le 29999 ] && \
+        [ $(( BASH_REMATCH[2] - BASH_REMATCH[1] )) -eq 19 ] && echo ok || echo "bad: $range")"
+expect "default range published 1:1 on loopback" "127.0.0.1:$range:$range"
+runup "$UP" "$T/ws/app"
+expect "default range is stable per project" "DEV_PORT_RANGE=$range"
+mkdir -p "$T/ws/other"
+runup "$UP" "$T/ws/other"
+lacks "a different project gets a different range" "DEV_PORT_RANGE=$range"
+runup DEV_PORT_RANGE=9000-9009 "$UP" "$T/ws/app"
+expect "explicit range published" "127.0.0.1:9000-9009:9000-9009"
+expect "explicit range exported" "DEV_PORT_RANGE=9000-9009"
+runup DEV_PORT_RANGE=none "$UP" "$T/ws/app"
+check "DEV_PORT_RANGE=none publishes nothing" "" "$(grep -E '^(DEV_PORT_RANGE=|127\.0\.0\.1:)' <<< "$OUT")"
+env "${base_env[@]}" DEV_PORT_RANGE=9010-9000 "$UP" "$T/ws/app" >/dev/null 2>&1
+check "reversed range rejected" 1 "$?"
+
 runup DEV_ASSETS="$T/ws" "$UP" "$T/ws/app"
 expect "DEV_ASSETS mounted read-only" "$T/ws:/opt/assets:ro"
 runup DEV_DOCTOR=1 "$UP" "$T/ws/app"
