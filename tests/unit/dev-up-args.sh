@@ -27,7 +27,8 @@ Character devices:
  243 hidraw
 DEVS
 base_env=(HOME="$H" DEV_PRINT=1 DEV_NO_BUILD=1 DEV_ROOT="$DEVROOT" DEV_PROC_DEVICES="$T/devices"
-          DEV_DBUS_SOCKET="$T/dbus.sock" SSH_AUTH_SOCK=)
+          DEV_DBUS_SOCKET="$T/dbus.sock" SSH_AUTH_SOCK= WAYLAND_DISPLAY= DISPLAY= XAUTHORITY=
+          DEV_X11_DIR="$T/x11")
 runup() { OUT="$(env "${base_env[@]}" "$@" 2>"$T/err")"; RC=$?; }
 
 runup "$UP" "$T/ws/app"
@@ -124,6 +125,23 @@ runup DEV_ASSETS="$T/ws" "$UP" "$T/ws/app"
 expect "DEV_ASSETS mounted read-only" "$T/ws:/opt/assets:ro"
 runup DEV_DOCTOR=1 "$UP" "$T/ws/app"
 check "DEV_DOCTOR runs dev-doctor" "dev-doctor" "$(tail -1 <<< "$OUT")"
+
+# --- clipboard (pasting images into Claude) ------------------------------------
+mkdir -p "$T/xdg" "$T/x11"; touch "$T/xdg/wayland-1" "$T/xauth"
+runup XDG_RUNTIME_DIR="$T/xdg" WAYLAND_DISPLAY=wayland-1 DISPLAY=:0 "$UP" "$T/ws/app"
+expect "wayland socket forwarded" "$T/xdg/wayland-1:/run/host-wayland/wayland-0"
+expect "wayland display is the absolute in-container path" "WAYLAND_DISPLAY=/run/host-wayland/wayland-0"
+lacks "wayland wins over x11" "DISPLAY=:0"
+runup WAYLAND_DISPLAY="$T/xdg/wayland-1" "$UP" "$T/ws/app"
+expect "absolute WAYLAND_DISPLAY used as is" "$T/xdg/wayland-1:/run/host-wayland/wayland-0"
+runup DISPLAY=:1 XAUTHORITY="$T/xauth" "$UP" "$T/ws/app"
+expect "x11 socket dir forwarded read-only" "$T/x11:/tmp/.X11-unix:ro"
+expect "x11 DISPLAY passed" "DISPLAY=:1"
+expect "xauthority forwarded" "$T/xauth:/tmp/.host-Xauthority:ro"
+runup XDG_RUNTIME_DIR="$T/xdg" WAYLAND_DISPLAY=wayland-1 DISPLAY=:0 DEV_CLIPBOARD=0 "$UP" "$T/ws/app"
+check "DEV_CLIPBOARD=0 forwards no display" "" "$(grep -E '^(WAYLAND_DISPLAY|DISPLAY)=' <<< "$OUT")"
+runup "$UP" "$T/ws/app"
+check "no display -> warning" 1 "$(grep -c 'pasting images' "$T/err")"
 
 [ "$fails" -eq 0 ] || { echo "$fails failure(s)" >&2; exit 1; }
 echo "dev-up-args: all passed"

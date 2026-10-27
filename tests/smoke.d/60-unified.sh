@@ -51,6 +51,12 @@ out=$(trail telemetry status 2>&1 || true)
 grep -qi 'disabled\|off' <<< "$out" || fail "trail telemetry is not disabled: $out"
 pass "trail telemetry disabled"
 
+echo "== clipboard clients (image paste) =="
+for b in wl-paste xclip; do
+    command -v "$b" >/dev/null || fail "missing: $b (Claude cannot read pasted images)"
+    pass "$b"
+done
+
 echo "== short baseline memory =="
 M="$HOME/.claude/CLAUDE.md"
 lines=$(wc -l < "$M")

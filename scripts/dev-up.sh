@@ -41,6 +41,8 @@
 #                          sessions of the two never collide. Also holds tmp/, the
 #                          persisted Claude scratchpads
 #   DEV_SCRATCH_DAYS=<n>   prune persisted scratchpads idle for n days (default 14)
+#   DEV_CLIPBOARD=0        don't forward the host display socket (Wayland, else X11);
+#                          without it, images can't be pasted into Claude
 #   DEV_PRINT=1            print the final `docker run` argv, one per line, and exit
 #                          (no build, no docker call; used by the unit tests)
 #
@@ -54,7 +56,7 @@
 #                          REQUIRED for BLE on STM32WBA (ST binary libraries, SLA0044)
 #
 # Test hooks (default to the real system): DEV_ROOT=/dev, DEV_PROC_DEVICES=/proc/devices,
-# DEV_DBUS_SOCKET=/run/dbus/system_bus_socket.
+# DEV_DBUS_SOCKET=/run/dbus/system_bus_socket, DEV_X11_DIR=/tmp/.X11-unix.
 
 set -euo pipefail
 
@@ -308,6 +310,33 @@ else
     echo "WARN: SSH_AUTH_SOCK not set; git over SSH won't work inside the container." >&2
 fi
 
+# Clipboard, so images pasted into Claude (Ctrl+V) reach it: Claude Code reads them
+# by running xclip, then wl-paste, against the host display. The Wayland socket is
+# preferred (WSLg provides one too); an X-only session gets the X11 socket instead.
+# Any client on either socket can read the clipboard, and X11 also lets it watch
+# input, hence the opt-out. Absolute WAYLAND_DISPLAY needs no XDG_RUNTIME_DIR inside.
+CLIP_ARGS=()
+X11_DIR="${DEV_X11_DIR:-/tmp/.X11-unix}"
+if [ "${DEV_CLIPBOARD:-1}" != "0" ]; then
+    WL_SOCK=""
+    case "${WAYLAND_DISPLAY:-}" in
+        "") ;;
+        /*) WL_SOCK="$WAYLAND_DISPLAY" ;;
+        *)  WL_SOCK="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/$WAYLAND_DISPLAY" ;;
+    esac
+    if [ -n "$WL_SOCK" ] && { [ -S "$WL_SOCK" ] || { [ "$PRINT" = "1" ] && [ -e "$WL_SOCK" ]; }; }; then
+        CLIP_ARGS=(-v "$WL_SOCK:/run/host-wayland/wayland-0"
+                   -e WAYLAND_DISPLAY=/run/host-wayland/wayland-0)
+    elif [ -n "${DISPLAY:-}" ] && [ -d "$X11_DIR" ]; then
+        CLIP_ARGS=(-v "$X11_DIR:/tmp/.X11-unix:ro" -e "DISPLAY=$DISPLAY")
+        if [ -n "${XAUTHORITY:-}" ] && [ -f "$XAUTHORITY" ]; then
+            CLIP_ARGS+=(-v "$XAUTHORITY:/tmp/.host-Xauthority:ro" -e XAUTHORITY=/tmp/.host-Xauthority)
+        fi
+    else
+        echo "WARN: no Wayland or X11 display found; pasting images into Claude won't work." >&2
+    fi
+fi
+
 # Publish dev-server ports on loopback only (the web interface of whatever you build).
 # The range keeps the same numbers on both sides, so a URL printed inside the
 # container works unchanged in the host browser. The per-project default comes from
@@ -361,6 +390,7 @@ DOCKER_ARGV=(
     "${USER_ARGS[@]}"
     "${ENV_ARGS[@]}"
     "${SSH_ARGS[@]}"
+    "${CLIP_ARGS[@]}"
     "${PORT_ARGS[@]}"
     "${NET_ARGS[@]}"
     "$IMAGE_NAME" "${CMD_ARGS[@]}"

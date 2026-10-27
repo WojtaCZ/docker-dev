@@ -290,6 +290,12 @@ ENV CHROME_PATH=/usr/bin/chromium
 RUN npm install -g "lighthouse@${LIGHTHOUSE_VERSION}" && \
     lighthouse --version
 
+# Clipboard clients: Claude Code reads pasted images through xclip or wl-paste,
+# talking to the host display socket that dev-up.sh forwards.
+RUN pacman -Syu --noconfirm && \
+    pacman -S --noconfirm --needed wl-clipboard xclip && \
+    pacman -Scc --noconfirm
+
 # ===========================================================================
 # 7. Documentation: firmware API docs and user manuals
 #
