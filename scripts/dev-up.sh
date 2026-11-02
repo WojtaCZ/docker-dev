@@ -233,8 +233,12 @@ fi
 #   hidraw : a USB device under test that enumerates as HID
 #   ttyACM : CDC-ACM debug probes' virtual COM port (ST-Link VCP, ...)
 #   ttyUSB : USB-serial adapters (FTDI/CP210x/CH340, the Telink programmer path)
-for subsys in hidraw ttyACM ttyUSB; do
-    major="$(major_of "$subsys")"
+# A subsystem is only listed in /proc/devices once its module is loaded, i.e. after
+# the first such device was plugged in since boot. ttyACM (166) and ttyUSB (188) have
+# kernel-fixed majors, so they fall back to those; hidraw's is dynamic and cannot.
+for subsys in hidraw ttyACM:166 ttyUSB:188; do
+    major="$(major_of "${subsys%%:*}")"
+    [ -z "$major" ] && [ "$subsys" != "${subsys#*:}" ] && major="${subsys#*:}"
     [ -n "$major" ] && USB_ARGS+=(--device-cgroup-rule="c $major:* rmw")
 done
 

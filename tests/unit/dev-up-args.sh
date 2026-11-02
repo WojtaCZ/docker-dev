@@ -89,6 +89,11 @@ OUT="$(env HOME="$EMPTY/home" DEV_PRINT=1 DEV_NO_BUILD=1 DEV_ROOT="$EMPTY/dev" D
         DEV_DBUS_SOCKET="$EMPTY/none.sock" SSH_AUTH_SOCK= "$UP" "$EMPTY/ws" 2>"$T/err2")"; RC=$?
 check "bare host: exit 0" 0 "$RC"
 check "bare host: still a docker run argv" "run" "$(grep -m1 -Fx run <<< "$OUT")"
+# cdc_acm / usbserial not loaded yet (nothing plugged in since boot): their majors
+# are fixed by the kernel, so the grants must not depend on /proc/devices.
+expect "bare host: ttyACM cgroup rule anyway" "--device-cgroup-rule=c 166:* rmw"
+expect "bare host: ttyUSB cgroup rule anyway" "--device-cgroup-rule=c 188:* rmw"
+lacks "bare host: no hidraw rule without a major" "--device-cgroup-rule=c :* rmw"
 lacks "bare host: no telink mount" "$EMPTY/home/telink/Telink_825X_SDK:/opt/telink/sdk:ro"
 check "bare host: warnings go to stderr only" "" "$(grep -c '^WARN' <<< "$OUT" | grep -v '^0$')"
 
