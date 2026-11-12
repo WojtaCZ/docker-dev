@@ -296,6 +296,13 @@ RUN pacman -Syu --noconfirm && \
     pacman -S --noconfirm --needed wl-clipboard xclip && \
     pacman -Scc --noconfirm
 
+# Docker client (CLI, compose and buildx plugins), NOT the daemon: the container
+# talks to a Docker engine through a mounted socket or DOCKER_HOST.
+RUN pacman -Syu --noconfirm && \
+    pacman -S --noconfirm --needed docker docker-compose docker-buildx && \
+    pacman -Scc --noconfirm && \
+    docker --version && docker compose version
+
 # ===========================================================================
 # 7. Documentation: firmware API docs and user manuals
 #
