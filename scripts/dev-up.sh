@@ -43,6 +43,11 @@
 #   DEV_SCRATCH_DAYS=<n>   prune persisted scratchpads idle for n days (default 14)
 #   DEV_CLIPBOARD=0        don't forward the host display socket (Wayland, else X11);
 #                          without it, images can't be pasted into Claude
+#   DEV_DOCKER=0           don't hand the container the host Docker socket (default: on
+#                          when present; host-root equivalent). DEV_DOCKER_SOCK=<path>
+#                          overrides the socket (else unix:// DOCKER_HOST, else
+#                          /var/run/docker.sock). The project is also mounted at its host
+#                          path, exported as DEV_HOST_WORKSPACE, for bind mounts
 #   DEV_PRINT=1            print the final `docker run` argv, one per line, and exit
 #                          (no build, no docker call; used by the unit tests)
 #
@@ -56,7 +61,8 @@
 #                          REQUIRED for BLE on STM32WBA (ST binary libraries, SLA0044)
 #
 # Test hooks (default to the real system): DEV_ROOT=/dev, DEV_PROC_DEVICES=/proc/devices,
-# DEV_DBUS_SOCKET=/run/dbus/system_bus_socket, DEV_X11_DIR=/tmp/.X11-unix.
+# DEV_DBUS_SOCKET=/run/dbus/system_bus_socket, DEV_X11_DIR=/tmp/.X11-unix,
+# DEV_DOCKER_SOCK=/var/run/docker.sock.
 
 set -euo pipefail
 
@@ -279,6 +285,39 @@ for g in dialout plugdev input uucp audio; do
     [ -n "$gid" ] && GROUP_ARGS+=(--group-add "$gid")
 done
 
+# Docker outside of Docker: the image carries the docker CLI/compose/buildx but no
+# usable daemon (dockerd needs privileges a dev container must not have). Hand it the
+# HOST engine's socket instead, so `docker build` / `docker run` / `docker compose up`
+# inside run sibling containers on the host. This is root-equivalent on the host, hence
+# DEV_DOCKER=0 to opt out.
+#
+# Bind-mount sources in those commands are resolved by the HOST daemon, so a path like
+# /workspaces/<name>-<hash>/data means nothing to it. The project is therefore ALSO
+# mounted at its real host path and exported as DEV_HOST_WORKSPACE: `cd "$DEV_HOST_WORKSPACE"`
+# before `docker run -v "$PWD/x:/x"` or `docker compose up` with relative volumes.
+DOCKER_ARGS=()
+if [ "${DEV_DOCKER:-1}" != "0" ]; then
+    DOCKER_SOCK="${DEV_DOCKER_SOCK:-}"
+    if [ -z "$DOCKER_SOCK" ]; then
+        case "${DOCKER_HOST:-}" in
+            unix://*) DOCKER_SOCK="${DOCKER_HOST#unix://}" ;;
+            "")       DOCKER_SOCK="/var/run/docker.sock" ;;
+        esac
+    fi
+    if [ -n "$DOCKER_SOCK" ] && { [ -S "$DOCKER_SOCK" ] || { [ "$PRINT" = "1" ] && [ -e "$DOCKER_SOCK" ]; }; }; then
+        DOCKER_ARGS+=(-v "$DOCKER_SOCK:/var/run/docker.sock" -e DOCKER_HOST=unix:///var/run/docker.sock)
+        # The socket is root:docker 0660; the docker group's GID differs per host, so
+        # take it from the socket itself rather than from a group name.
+        sock_gid="$(stat -c %g "$DOCKER_SOCK" 2>/dev/null || true)"
+        [ -n "$sock_gid" ] && [ "$sock_gid" != "0" ] && DOCKER_ARGS+=(--group-add "$sock_gid")
+        [ "$WORKSPACE" != "$WS_MOUNT" ] && DOCKER_ARGS+=(-v "$WORKSPACE:$WORKSPACE")
+        DOCKER_ARGS+=(-e "DEV_HOST_WORKSPACE=$WORKSPACE")
+        echo "info: host Docker engine available inside (host-root equivalent; DEV_DOCKER=0 disables)" >&2
+    else
+        echo "WARN: no host Docker socket (${DOCKER_SOCK:-DOCKER_HOST=$DOCKER_HOST}); docker inside the container won't work." >&2
+    fi
+fi
+
 # UID alignment for the bind-mounted workspace.
 USER_ARGS=()
 HOST_UID="$(id -u)"
@@ -291,7 +330,18 @@ ENV_ARGS=(-e "DEV_WORKSPACE=$WS_MOUNT")
 [ "${DEV_SKIP_UPDATE:-0}" = "1" ] && ENV_ARGS+=(-e DEV_SKIP_UPDATE=1)
 [ "${DEV_TRAIL:-1}" = "0" ] && ENV_ARGS+=(-e DEV_TRAIL=0)
 [ -n "${DEV_SCRATCH_DAYS:-}" ] && ENV_ARGS+=(-e "DEV_SCRATCH_DAYS=$DEV_SCRATCH_DAYS")
-[ -n "${GITHUB_TOKEN:-}" ] && ENV_ARGS+=(-e "GITHUB_TOKEN=$GITHUB_TOKEN")
+# GitHub CLI auth: forward the host's token so `gh` works in a fresh container without
+# `gh auth login` after every rebuild. An explicit GH_TOKEN/GITHUB_TOKEN wins; otherwise
+# ask the host's gh. (Mounting ~/.config/gh would not work: gh usually keeps the token
+# in the host keyring, not in hosts.yml.) DEV_NO_GH_TOKEN=1 opts out.
+# Passed by name only (-e VAR, value inherited by `exec docker`), so the token never
+# appears in the docker argv, `ps`, or DEV_PRINT output.
+if [ -z "${GH_TOKEN:-}" ] && [ -z "${GITHUB_TOKEN:-}" ] && [ "${DEV_NO_GH_TOKEN:-0}" != "1" ] \
+   && command -v gh >/dev/null 2>&1; then
+    GH_TOKEN="$(gh auth token --hostname github.com 2>/dev/null || true)"
+fi
+[ -n "${GH_TOKEN:-}" ] && { export GH_TOKEN; ENV_ARGS+=(-e GH_TOKEN); }
+[ -n "${GITHUB_TOKEN:-}" ] && { export GITHUB_TOKEN; ENV_ARGS+=(-e GITHUB_TOKEN); }
 
 # Git identity: reuse the host's, passed as env rather than copying ~/.gitconfig
 # (which would drag host-specific credential helpers and paths into the container).
@@ -391,6 +441,7 @@ DOCKER_ARGV=(
     "${MOUNTS[@]}"
     "${USB_ARGS[@]}"
     "${GROUP_ARGS[@]}"
+    "${DOCKER_ARGS[@]}"
     "${USER_ARGS[@]}"
     "${ENV_ARGS[@]}"
     "${SSH_ARGS[@]}"

@@ -16,7 +16,7 @@ lacks() { if has "$1" "$2"; then echo "FAIL: $1: argv unexpectedly has [$2]" >&2
 H="$T/home"; DEVROOT="$T/dev"
 mkdir -p "$H/.claude/projects" "$DEVROOT/bus/usb" "$DEVROOT/input" "$DEVROOT/snd" "$DEVROOT/serial/by-id" \
          "$H/telink/Telink_825X_SDK" "$H/st/STM32CubeCLT" "$H/st/cubewba" "$T/ws/app"
-touch "$H/.claude.json" "$H/.claude/.credentials.json" "$T/dbus.sock"
+touch "$H/.claude.json" "$H/.claude/.credentials.json" "$T/dbus.sock" "$T/docker.sock"
 cat > "$T/devices" <<'DEVS'
 Character devices:
   13 input
@@ -28,7 +28,8 @@ Character devices:
 DEVS
 base_env=(HOME="$H" DEV_PRINT=1 DEV_NO_BUILD=1 DEV_ROOT="$DEVROOT" DEV_PROC_DEVICES="$T/devices"
           DEV_DBUS_SOCKET="$T/dbus.sock" SSH_AUTH_SOCK= WAYLAND_DISPLAY= DISPLAY= XAUTHORITY=
-          DEV_X11_DIR="$T/x11")
+          DEV_X11_DIR="$T/x11" DEV_DOCKER_SOCK="$T/docker.sock"
+          GH_TOKEN= GITHUB_TOKEN= DEV_NO_GH_TOKEN=1)
 runup() { OUT="$(env "${base_env[@]}" "$@" 2>"$T/err")"; RC=$?; }
 
 runup "$UP" "$T/ws/app"
@@ -131,6 +132,20 @@ expect "DEV_ASSETS mounted read-only" "$T/ws:/opt/assets:ro"
 runup DEV_DOCTOR=1 "$UP" "$T/ws/app"
 check "DEV_DOCTOR runs dev-doctor" "dev-doctor" "$(tail -1 <<< "$OUT")"
 
+# --- host Docker engine (docker outside of docker) ------------------------------
+runup "$UP" "$T/ws/app"
+expect "host docker socket mounted" "$T/docker.sock:/var/run/docker.sock"
+expect "DOCKER_HOST points at it" "DOCKER_HOST=unix:///var/run/docker.sock"
+expect "socket's group added" "$(stat -c %g "$T/docker.sock")"
+expect "workspace mirrored at its host path" "$ws_abs:$ws_abs"
+expect "DEV_HOST_WORKSPACE exported" "DEV_HOST_WORKSPACE=$ws_abs"
+runup DEV_DOCKER=0 "$UP" "$T/ws/app"
+lacks "DEV_DOCKER=0: no socket" "$T/docker.sock:/var/run/docker.sock"
+lacks "DEV_DOCKER=0: no host-path mirror" "$ws_abs:$ws_abs"
+runup DEV_DOCKER_SOCK="$T/none.sock" "$UP" "$T/ws/app"
+lacks "missing socket: nothing mounted" "DOCKER_HOST=unix:///var/run/docker.sock"
+check "missing socket: warning" 1 "$(grep -c 'no host Docker socket' "$T/err")"
+
 # --- clipboard (pasting images into Claude) ------------------------------------
 mkdir -p "$T/xdg" "$T/x11"; touch "$T/xdg/wayland-1" "$T/xauth"
 runup XDG_RUNTIME_DIR="$T/xdg" WAYLAND_DISPLAY=wayland-1 DISPLAY=:0 "$UP" "$T/ws/app"
@@ -147,6 +162,22 @@ runup XDG_RUNTIME_DIR="$T/xdg" WAYLAND_DISPLAY=wayland-1 DISPLAY=:0 DEV_CLIPBOAR
 check "DEV_CLIPBOARD=0 forwards no display" "" "$(grep -E '^(WAYLAND_DISPLAY|DISPLAY)=' <<< "$OUT")"
 runup "$UP" "$T/ws/app"
 check "no display -> warning" 1 "$(grep -c 'pasting images' "$T/err")"
+
+# --- GitHub token forwarding (by name only, never by value) ----------------------
+mkdir -p "$T/bin"
+printf '#!/bin/sh\n[ "$1 $2" = "auth token" ] && echo gho_fromhostgh\n' > "$T/bin/gh"; chmod +x "$T/bin/gh"
+runup PATH="$T/bin:$PATH" DEV_NO_GH_TOKEN=0 "$UP" "$T/ws/app"
+expect "host gh token -> GH_TOKEN by name" "GH_TOKEN"
+check "host gh token value not in argv" 0 "$(grep -c gho_fromhostgh <<< "$OUT")"
+runup PATH="$T/bin:$PATH" DEV_NO_GH_TOKEN=1 "$UP" "$T/ws/app"
+lacks "DEV_NO_GH_TOKEN=1 -> no GH_TOKEN" "GH_TOKEN"
+runup GITHUB_TOKEN=ghp_explicit "$UP" "$T/ws/app"
+expect "explicit GITHUB_TOKEN forwarded by name" "GITHUB_TOKEN"
+check "explicit token value not in argv" 0 "$(grep -c ghp_explicit <<< "$OUT")"
+lacks "explicit GITHUB_TOKEN skips host gh" "GH_TOKEN"
+runup "$UP" "$T/ws/app"
+lacks "no token -> no GH_TOKEN" "GH_TOKEN"
+lacks "no token -> no GITHUB_TOKEN" "GITHUB_TOKEN"
 
 [ "$fails" -eq 0 ] || { echo "$fails failure(s)" >&2; exit 1; }
 echo "dev-up-args: all passed"

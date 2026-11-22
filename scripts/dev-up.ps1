@@ -40,6 +40,8 @@ param(
     [switch]$NoTrail,
     [switch]$NoServices,
     [switch]$NoClipboard,
+    [switch]$NoDocker,
+    [string]$DockerSock,
     [string]$Probe,
     [string]$Ports,
     [string]$PortRange,
@@ -62,6 +64,8 @@ $env:DEV_DOCTOR           = if ($Doctor)          { "1" } else { "0" }
 $env:DEV_NO_SERVICES      = if ($NoServices)      { "1" } else { "0" }
 $env:DEV_TRAIL            = if ($NoTrail)         { "0" } else { "1" }
 $env:DEV_CLIPBOARD        = if ($NoClipboard)     { "0" } else { "1" }
+$env:DEV_DOCKER           = if ($NoDocker)        { "0" } else { "1" }
+if ($DockerSock) { $env:DEV_DOCKER_SOCK = $DockerSock }  # a WSL path; dev-up.sh exports DEV_HOST_WORKSPACE itself
 if ($Image)     { $env:DEV_IMAGE      = $Image }
 if ($Container) { $env:DEV_CONTAINER  = $Container }
 if ($Probe)     { $env:DEV_PROBE      = $Probe }
@@ -76,7 +80,7 @@ if ($CubeWba)   { $env:DEV_CUBEWBA    = $CubeWba }
 
 # WSLENV makes these visible to the Linux side of the call.
 $env:WSLENV = "DEV_NO_BUILD:DEV_NO_PULL:DEV_REBUILD:DEV_NO_CACHE_VOLUMES:" +
-              "DEV_SKIP_UPDATE:DEV_DOCTOR:DEV_NO_SERVICES:DEV_TRAIL:DEV_CLIPBOARD:" +
+              "DEV_SKIP_UPDATE:DEV_DOCTOR:DEV_NO_SERVICES:DEV_TRAIL:DEV_CLIPBOARD:DEV_DOCKER:DEV_DOCKER_SOCK:" +
               "DEV_IMAGE:DEV_CONTAINER:DEV_PROBE:DEV_PORTS:DEV_PORT_RANGE:DEV_ASSETS:DEV_STATE_DIR:DEV_SCRATCH_DAYS:" +
               "DEV_TELINK_SDK:DEV_CUBECLT:DEV_CUBEWBA"
 
