@@ -88,6 +88,14 @@ project: `trail init --agents claude --yes`, then `trail build` on later runs, w
 at the parent for a folder of separate repos. It **never commits**; it tells you which
 files appeared and which already-tracked files changed. `/trail-setup` does it on demand.
 
+Repos cloned mid-session are picked up too: the entrypoint starts `trail-ensure --watch`
+on the workspace, which polls every 20 s (`DEV_TRAIL_WATCH_INTERVAL`) and runs the same
+setup once a new repo has settled (HEAD resolves, no `index.lock`), whether it was cloned
+in the container or on the host. Clone directly into the workspace (`<workspace>/<repo>`);
+a folder of repos is scanned one level deep. Log: `/tmp/trail-watch.log` in the container;
+`DEV_TRAIL_WATCH=0` turns only the watcher off. Runs share a lock, so the hook and the
+watcher never run Trail at the same time.
+
 Turn it off with an empty `.no-trail` file in a repo, or `DEV_TRAIL=0`. Telemetry is off
 (`trail telemetry disable` at build time).
 

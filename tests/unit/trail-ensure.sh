@@ -98,5 +98,36 @@ mkrepo "$T/stdin"; : > "$T/stdin.log"
 : > "$TRAIL_LOG"; echo SECRET-HOOK-INPUT | TRAIL_STDIN_LOG="$T/stdin.log" "$ENSURE" "$T/stdin" >/dev/null 2>&1
 check "hook stdin is not passed on to trail" "" "$(cat "$T/stdin.log")"
 
+# --- lock: a second run while one holds the lock skips at once, exit 0 ---
+export TRAIL_ENSURE_LOCK="$T/lock"
+mkrepo "$T/locked"
+exec 8>>"$TRAIL_ENSURE_LOCK"; flock 8
+run "$T/locked"
+check "locked -> nothing run" "" "$LOG"; check "locked exit 0" 0 "$RC"
+case "$OUT" in *"another trail-ensure"*) check "locked says why" ok ok ;; *) check "locked says why" "mentions another run" "$OUT" ;; esac
+flock -u 8; exec 8>&-
+
+# --- watch: a repo cloned into the workspace mid-session gets set up ---
+waitlog() { # pattern seconds
+    local i; for i in $(seq 1 "$2"); do grep -q "$1" "$TRAIL_LOG" 2>/dev/null && return 0; sleep 0.5; done; return 1; }
+mkdir "$T/ws"; mkrepo "$T/ws/old"; mkdir "$T/ws/old/.trail"
+: > "$TRAIL_LOG"
+DEV_TRAIL_WATCH_INTERVAL=1 "$ENSURE" --watch "$T/ws" > "$T/watch.out" 2>&1 & wpid=$!
+sleep 3
+check "watch: settled workspace, nothing new -> nothing run" "" "$(cat "$TRAIL_LOG")"
+# Half-finished clone: .git present, no HEAD yet -> must not trigger.
+git init -q "$T/ws/new"; echo a > "$T/ws/new/a"
+sleep 3
+check "watch: repo without HEAD (mid-clone) -> nothing run" "" "$(cat "$TRAIL_LOG")"
+(cd "$T/ws/new" && git add a && git commit -qm init)
+if waitlog "ws/new|init --agents claude --yes" 20; then check "watch: new repo -> init in it" ok ok
+else check "watch: new repo -> init in it" "ws/new init" "$(cat "$TRAIL_LOG")"; fi
+grep -q "^$T/ws|build" "$TRAIL_LOG" && check "watch: parent map rebuilt" ok ok || check "watch: parent map rebuilt" "ws build" "$(cat "$TRAIL_LOG")"
+n="$(grep -c 'ws/new|init' "$TRAIL_LOG")"; sleep 4
+check "watch: init runs once, not on every poll" "$n" "$(grep -c 'ws/new|init' "$TRAIL_LOG")"
+kill "$wpid" 2>/dev/null; wait "$wpid" 2>/dev/null
+: > "$TRAIL_LOG"; DEV_TRAIL=0 timeout 5 "$ENSURE" --watch "$T/ws" >/dev/null 2>&1
+check "watch: DEV_TRAIL=0 exits at once" 0 "$?"
+
 [ "$fails" -eq 0 ] || { echo "$fails failure(s)" >&2; exit 1; }
 echo "trail-ensure: all passed"

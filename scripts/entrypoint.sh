@@ -146,6 +146,14 @@ if [ -d "$SCRATCH_ROOT" ] && [[ "$SCRATCH_DAYS" =~ ^[0-9]+$ ]] && [ "$SCRATCH_DA
     done
 fi
 
+# Trail-Code for repos cloned mid-session: the SessionStart hook only runs when Claude
+# starts, so a watcher re-runs trail-ensure when a new repo settles in the workspace.
+# Output goes to a log, never the user's TTY. Off with DEV_TRAIL=0 or DEV_TRAIL_WATCH=0.
+if [ "${DEV_TRAIL:-1}" != "0" ] && [ "${DEV_TRAIL_WATCH:-1}" != "0" ] \
+   && [ -n "${DEV_WORKSPACE:-}" ] && [ -d "$DEV_WORKSPACE" ] && command -v trail-ensure >/dev/null 2>&1; then
+    setsid trail-ensure --watch "$DEV_WORKSPACE" >>/tmp/trail-watch.log 2>&1 </dev/null &
+fi
+
 # Best-effort self-update; never block container start.
 # Set DEV_SKIP_UPDATE=1 for fast cold starts or offline use.
 if [ "${DEV_SKIP_UPDATE:-0}" != "1" ]; then
