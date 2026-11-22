@@ -1,5 +1,10 @@
 {
     "$schema": "https://json.schemastore.org/claude-code-settings.json",
+    "env": {
+        "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "200000",
+        "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "70",
+        "DISABLE_AUTO_COMPACT": "0"
+    },
     "enabledPlugins": {
         "superpowers@claude-plugins-official": true,
         "frontend-design@claude-plugins-official": true,
@@ -96,6 +101,16 @@
                         "timeout": 10
                     }
                 ]
+            },
+            {
+                "matcher": "startup|resume|compact",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "claude-usage hook",
+                        "timeout": 15
+                    }
+                ]
             }
         ],
         "SubagentStart": [
@@ -104,6 +119,49 @@
                     {
                         "type": "command",
                         "command": "work-notes subagent",
+                        "timeout": 10
+                    }
+                ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "claude-usage hook",
+                        "timeout": 10
+                    }
+                ]
+            }
+        ],
+        "PostToolUse": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "claude-usage hook",
+                        "timeout": 15
+                    }
+                ]
+            }
+        ],
+        "PreToolUse": [
+            {
+                "matcher": "Agent|Task|Workflow",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "claude-usage hook",
+                        "timeout": 60
+                    }
+                ]
+            }
+        ],
+        "SubagentStop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "claude-usage hook",
                         "timeout": 10
                     }
                 ]

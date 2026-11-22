@@ -468,6 +468,13 @@ COPY --chown=${USER_UID}:${USER_GID} claude-baseline/settings.json \
 COPY --chown=${USER_UID}:${USER_GID} claude-baseline/CLAUDE.layer.md \
      /home/${USER_NAME}/.claude-memory-layers/00-baseline.md
 
+# Usage pacing: `claude-usage` reads /usage through a throwaway claude in tmux; the
+# usage-pacing skill and the hooks in settings.json use it. Kept last so editing the
+# script rebuilds only these layers.
+USER root
+RUN pacman -Syu --noconfirm && pacman -S --noconfirm --needed tmux && pacman -Scc --noconfirm && tmux -V
+COPY --chmod=755 scripts/claude-usage.sh /usr/local/bin/claude-usage
+
 # Default user stays ${USER_NAME}; the entrypoint's root phase is inert here.
 # To use the UID/GID remap, start the container as root and let the entrypoint
 # drop privileges itself (dev-up.sh does this when the host UID is not 1000):
