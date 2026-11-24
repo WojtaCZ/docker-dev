@@ -14,7 +14,7 @@ filesystem.
 | ARM Cortex-M | `arm-none-eabi-*` (newlib, v8-m.main), CMSIS_6, CMSIS-DSP per core, ST device headers, STM32 SVDs |
 | WCH RISC-V | `riscv-none-elf-*` (xPack), `wlink`, `wchisp`, ch32fun at `$CH32FUN_ROOT` (never export `CH32FUN`) |
 | Telink TLSR8258 | runtime pieces only; the compiler is a **host mount** at `/opt/telink/sdk` (skill `telink-sdk-mount`) |
-| Debug / probes | `openocd`, `probe-rs`, `pyocd`, `st-flash`, `dfu-util`, `sigrok-cli`, `picocom`/`minicom`/`socat`, `bluetoothctl` |
+| Debug / probes | `openocd`, `probe-rs`, `pyocd`, `st-flash`, `dfu-util`, `sigrok-cli`, `picocom`/`minicom`/`socat`, `bluetoothctl`, `ppk2` (Nordic PPK2 power profiler, skill `ppk2-power-profiling`) |
 | Web | `php`, `composer`, `deno`, `bun`, `nginx`, `chromium` (Playwright), `sqlite`, DB clients |
 | Docs | `docs-init` / `docs-build` over `doxygen` + `dot`, `mkdocs` (material), `pandoc`, `typst`; `pdftoppm`; no LaTeX |
 | Trail-Code | `trail` (code map + learnings) |

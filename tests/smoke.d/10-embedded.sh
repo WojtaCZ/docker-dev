@@ -100,6 +100,16 @@ n_rules=$(find /opt/embedded/udev-rules -name '*.rules' | wc -l)
 [ ! -d /etc/udev/rules.d ] || [ -z "$(ls -A /etc/udev/rules.d 2>/dev/null)" ] \
     || echo "  note: /etc/udev/rules.d is non-empty; rules there are inert in a container"
 pass "$n_rules udev rule files under /opt/embedded/udev-rules"
+grep -q 'ID_MM_DEVICE_IGNORE' /opt/embedded/udev-rules/60-nordic-ppk2.rules \
+    || fail "PPK2 udev rule missing or lacks ModemManager ignore"
+pass "PPK2 udev rule"
+
+echo "== Nordic PPK2 CLI (simulated device) =="
+command -v ppk2 >/dev/null || fail "missing: ppk2"
+PPK2_SIMULATE=1 ppk2 measure --mode ampere --seconds 0.3 | jq -e '.samples == 30000 and .avg_uA > 0' >/dev/null \
+    || fail "ppk2 simulated measurement failed"
+ppk2 measure --mode source --seconds 0.1 >/dev/null 2>&1 && fail "ppk2 source mode accepted no --mv" || true
+pass "ppk2 CLI"
 
 echo "== profile runner, end to end =="
 work=$(mktemp -d)

@@ -10,7 +10,7 @@ Diagnose "the probe won't flash / debug" issues. Walk through these steps in ord
 ## Step 1: Is the probe visible on USB?
 
 ```bash
-lsusb | grep -i -E "stlink|blackmagic|cmsis|wch|xds|jlink|picoprobe|ftdi|1d50|0483|1a86|0451|2e8a|1366"
+lsusb | grep -i -E "stlink|blackmagic|cmsis|wch|xds|jlink|picoprobe|ftdi|1d50|0483|1a86|0451|2e8a|1366|1915"
 ```
 
 **Nothing found:** the probe is not seen by the container.

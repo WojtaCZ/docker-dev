@@ -111,6 +111,16 @@ RUN uv tool install pyocd && \
     mkdir -p /opt/pyocd && chmod 0777 /opt/pyocd && \
     pyocd --version
 
+# Nordic Power Profiler Kit II (PPK2). It is plain CDC-ACM (VID 1915 PID c00a), so
+# the kernel's cdc_acm is the only "driver"; host access is the udev rule
+# 60-nordic-ppk2.rules. ppk2-api (PyPI) speaks its serial protocol; it lives in its
+# own venv so it cannot disturb the system python, and `ppk2` is the CLI front end.
+RUN uv venv /opt/ppk2 && \
+    uv pip install --python /opt/ppk2/bin/python "ppk2-api==0.9.2" && \
+    /opt/ppk2/bin/python -c "import ppk2_api.ppk2_api, serial"
+COPY embedded/scripts/ppk2.py /usr/local/bin/ppk2
+RUN chmod +x /usr/local/bin/ppk2 && PPK2_SIMULATE=1 ppk2 list
+
 # SVD store: register-level reasoning, the VSCode Peripheral Viewer and the
 # register-decode-svd skill all need a .svd for the target. This is the
 # multi-vendor set; the ARM layer below adds modm-io's STM32 mirror on top.

@@ -119,3 +119,19 @@ if [ -n "${CROSS_PREFIX:-}" ]; then
 else
     emit OK "cross-prefix" "unset (expected in embedded-base — leaves set it)"
 fi
+
+# Nordic PPK2 power profiler: CLI + venv always; the device itself is optional.
+if have ppk2 && /opt/ppk2/bin/python -c "import ppk2_api.ppk2_api" 2>/dev/null; then
+    emit OK "ppk2-cli" "ppk2 + ppk2-api present"
+else
+    emit FAIL "ppk2-cli" "ppk2 CLI or /opt/ppk2 venv (ppk2-api) missing"
+fi
+if have ppk2; then
+    if ppk2 list >/dev/null 2>&1; then
+        emit OK "ppk2-device" "PPK2 (1915:c00a) found"
+    elif lsusb 2>/dev/null | grep -qi '1915:c00a'; then
+        emit WARN "ppk2-device" "on USB but no ttyACM: re-run dev-up.sh or dev-attach; check host udev rules (install-host-udev-rules.sh)"
+    else
+        emit OK "ppk2-device" "no PPK2 attached (optional; cable in DATA/POWER port, switch on)"
+    fi
+fi

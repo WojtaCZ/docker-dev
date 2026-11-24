@@ -1,0 +1,6 @@
+# Nordic Power Profiler Kit II (PPK2): VID 1915, PID c00a, plain CDC-ACM serial
+# (the stock cdc_acm kernel driver binds it; no vendor driver exists or is needed).
+# ID_MM_DEVICE_IGNORE keeps ModemManager from probing the port with AT commands,
+# which corrupts the PPK2's binary protocol and can leave it wedged.
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1915", ATTRS{idProduct}=="c00a", MODE="0666", GROUP="plugdev", ENV{ID_MM_DEVICE_IGNORE}="1"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1915", ATTRS{idProduct}=="c00a", MODE="0666", GROUP="plugdev", ENV{ID_MM_DEVICE_IGNORE}="1", SYMLINK+="ttyPPK2_%n"

@@ -31,7 +31,7 @@ per-project memory is keyed by that path.
 | ARM Cortex-M | `arm-none-eabi-*`, CMSIS_6, CMSIS-DSP (m0+, m3, m4f, m7f, m33f), ST device headers (16 families), STM32 SVDs |
 | WCH RISC-V | xPack `riscv-none-elf-*`, `wlink`, `wchisp`, ch32fun |
 | Telink TLSR8258 | runtime pieces; the compiler is a **host mount** (EULA) |
-| Debug / bench | openocd, probe-rs, pyocd, st-flash, dfu-util, sigrok-cli, picocom, bluetoothctl, ALSA tools |
+| Debug / bench | openocd, probe-rs, pyocd, st-flash, dfu-util, sigrok-cli, `ppk2` (Nordic PPK2 power profiler), picocom, bluetoothctl, ALSA tools |
 | Web | php, composer, deno, bun, nginx, chromium for Playwright, lighthouse, sqlite, DB clients; Claude plugins frontend-design, impeccable, modern-web-guidance, chrome-devtools-mcp |
 | Docs | `docs-init` / `docs-build`: doxygen + graphviz (firmware API docs), one Markdown manual built as a mkdocs-material website and a typst PDF (via pandoc); no TeX Live. `/write-manual` in Claude |
 | Trail-Code | `trail`, set up per project automatically (below) |
